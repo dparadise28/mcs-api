@@ -2,6 +2,7 @@ Starting bench for local server hitting static content being sent over the wire 
 
 `go run $GOPATH/src/github.com/rakyll/hey/hey.go -n 10000 -c 100 -h2 https://0.0.0.0/api/categories`
 
+```
 23 requests done.
 267 requests done.
 1420 requests done.
@@ -41,4 +42,4 @@ Latency distribution:
   90% in 0.0259 secs
   95% in 0.0399 secs
   99% in 1.1787 secs
-
+```
