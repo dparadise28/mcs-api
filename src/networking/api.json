@@ -1,0 +1,12 @@
+{
+	"transform_json": {
+		"return_type": "json",
+		"post": {
+			"method": "tools.RemodelJ",
+			"args": {
+				"response_structure": "response_structure",
+				"original_structure": "original_structure"
+			}
+		}
+	}
+}
