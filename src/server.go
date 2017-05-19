@@ -53,6 +53,7 @@ func InitServer() {
 func main() {
 	InitServer()
 	db.InitSession()
+	db.InitIndicies()
 	defer db.Database.Session.Close()
 	listen := ":" + port //os.Args[1])
 

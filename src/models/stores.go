@@ -42,17 +42,17 @@ type StoreDelivery struct {
 	// for now. That can be split out form the base
 	// store model
 	Fee       uint   `bson:"delivery_fee,omitempty" json:"delivery_fee"`
-	Offered   bool   `json:"offered"`
+	Offered   bool   `json:"offered" validate:"required"`
 	MaxDist   int    `bson:"max_distance,omitempty" json:"max_distance"`
-	MinTime   uint8  `bson:"min_time,omitempty" json:"min_time"`
-	MaxTime   uint8  `bson:"max_time,omitempty" json:"max_time"`
+	MinTime   uint8  `bson:"min_time,omitempty" json:"min_time" validate:"max=180,min=0"`
+	MaxTime   uint8  `bson:"max_time,omitempty" json:"max_time" validate:"max=180,min=0"`
 	MinAmount uint16 `bson:"min_amount,omitempty" json:"min_amount"`
 }
 
 type StorePickup struct {
-	Offered bool  `json:"offered"`
-	MinTime uint8 `json:"min_time"`
-	MaxTime uint8 `json:"max_time"`
+	Offered bool  `json:"offered" validate:"required"`
+	MinTime uint8 `json:"min_time" validate:"max=90,min=0"`
+	MaxTime uint8 `json:"max_time" validate:"max=90,min=0"`
 }
 
 type Store struct {

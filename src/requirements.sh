@@ -14,3 +14,6 @@ go get -v gopkg.in/mgo.v2
 
 echo getting benchmarking tools...
 go get github.com/rakyll/hey
+
+echo getting validation packages
+go get gopkg.in/go-playground/validator.v9
