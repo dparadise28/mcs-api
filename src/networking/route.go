@@ -15,15 +15,24 @@ var APIRouteMap = map[string]map[string]interface{}{
 		"handler_method": api.Categories,
 	},
 
-	"/stores": {
+	// products api
+
+	// users api
+
+	// stores api
+	"/store/instance/:store_id": {
 		"control_method": "GET",
-		"handler_method": api.FindStores,
+		"handler_method": api.StoreSearch,
 	},
-	"/store/info": {
-		"control_method": "GET",
-		"handler_method": api.StoreInfo,
+	"/store/create": {
+		"control_method": "POST",
+		"handler_method": api.StoreCreate,
 	},
-	"/store/categories": {
+	"/store/update/:store_id": {
+		"control_method": "POST",
+		"handler_method": api.StoreCreate,
+	},
+	"/store/categories/:store_id": {
 		"control_method": "GET",
 		"handler_method": api.StoreCategories,
 	},

@@ -19,6 +19,13 @@ func generateAPIEndPoint(fn HandlerMethodType) httprouter.Handle {
 			"Access-Control-Allow-Methods",
 			"GET, OPTION, HEAD, PATCH, PUT, POST, DELETE",
 		)
+		if req.Method == "POST" {
+			// A post should contain a request body
+			if req.Body == nil {
+				http.Error(respWrtr, "Please send a request body", 400)
+				return
+			}
+		}
 		log.Printf(
 			"Request for %s (Accept-Encoding: %s)",
 			req.URL.Path,

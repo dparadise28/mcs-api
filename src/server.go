@@ -4,58 +4,64 @@ import (
 	//"github.com/julienschmidt/httprouter"
 	"crypto/tls"
 	"flag"
-	"io/ioutil"
+	//"io/ioutil"
+	"db"
 	"log"
 	"net/http"
 	"networking"
-	"os"
+	//"os"
 	"time"
 )
 
 var (
-	listen = flag.String("listen", ":", "Port to listen on")
-	port   = flag.String("port", "", "Port input by user when starting server")
-	//config = flag.String("config", "", "Config file")
+	ssl            = false
+	port           = ""
+	certPath       = ""
+	sslCrtFileName = ""
+	sslKeyFileName = ""
 )
 
-func redirect(w http.ResponseWriter, req *http.Request) {
-	// remove/add not default ports from req.Host
-	target := "https://" + req.Host + *listen + req.URL.Path
+func RedirectHTTPS(w http.ResponseWriter, req *http.Request) {
+	// TODO: move out of base server and into networking utils
+
+	// remove/add non default ports from req.Host
+	target := "https://" + req.Host + req.URL.Path
 	if len(req.URL.RawQuery) > 0 {
 		target += "?" + req.URL.RawQuery
 	}
 	log.Printf("redirect to: %s", target)
 	http.Redirect(w, req, target, http.StatusTemporaryRedirect)
+
 }
 
-func log_ext_ip(port string) {
-	// lets log our external ip for easy access
-	resp, err := http.Get("http://myexternalip.com/raw")
-	if err == nil {
-		extip, extipErr := ioutil.ReadAll(resp.Body)
-		if extipErr == nil {
-			log.Println("Setting Server Address", string(extip[:len(extip)-1])+port)
-		} else {
-			log.Println("\n\nTrouble Parsing external ip\n\nSetting Server Address", port)
-		}
-	} else {
-		// shouldnt stop the server from starting
-		log.Println(err.Error())
-		log.Println("\n\nTrouble Retreiving external ip\n\nSetting Server Address", port)
+func InitServer() {
+	flag.StringVar(&port, "port", "", "Port input by user when starting server")
+	flag.StringVar(&db.AuthDatabase, "db_name", "", "Name of the db you would like to connect to")
+	flag.StringVar(&db.MongoDBUri, "mongo_db_uri", "",
+		"example: mongodb://<dbuser>:<dbpassword>@<dbhost1>,<dbhost2>,...:<port>/<dbname>")
+	flag.Parse()
+	if len(port) == 0 || len(db.MongoDBUri) == 0 || len(db.AuthDatabase) == 0 {
+		panic(`
+			Must provide a port to start the server on, a db uri to connect to
+			and a db name to use.
+
+			ex: go run server.go --port=443 --db_name=test-db --mongo_db_uri=mongodb://...
+		`)
 	}
-	resp.Body.Close()
 }
 
 func main() {
-	flag.Parse()
-	*listen += string(os.Args[1])
+	InitServer()
+	db.InitSession()
+	defer db.Database.Session.Close()
+	listen := ":" + port //os.Args[1])
 
 	// redirect every http request to https
-	go http.ListenAndServe(":80", http.HandlerFunc(redirect))
+	go http.ListenAndServe(":80", http.HandlerFunc(RedirectHTTPS))
 
 	log.Println("\n\n-----Starting Endpoints\n")
 	server := &http.Server{
-		Addr:         *listen,
+		Addr:         listen,
 		Handler:      http.Handler(networking.ServeEndPoints()),
 		ReadTimeout:  1 * time.Minute,
 		WriteTimeout: 1 * time.Minute,
@@ -74,15 +80,8 @@ func main() {
 			},
 		},
 	}
-	log_ext_ip(server.Addr)
-
-	// Listen as https ssl server
-	// NOTE: WITHOUT SSL IT WONT WORK!!
-	// To self generate a test ssl cert/key you could go to
-	// http://www.selfsignedcertificate.com/
-	// or read the openssl manual
-
-	if *listen != ":443" {
+	networking.LogExtIp(server.Addr)
+	if listen != ":443" {
 		log.Fatal(server.ListenAndServe())
 	} else {
 		log.Println("Starting TLS")
