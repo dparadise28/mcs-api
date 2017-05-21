@@ -4,11 +4,6 @@ import "gopkg.in/mgo.v2/bson"
 
 var StoreCollectionName = "Stores"
 
-type Hours struct {
-	From uint16 `json:"from"`
-	To   uint16 `json:"to"`
-}
-
 type OpenHours struct {
 	// split into am and pm to allow for efficient
 	// index and search in the case of non inclusive
@@ -29,11 +24,6 @@ type WeeklyWorkingHours struct {
 	Thu OpenHours `json:"thu"`
 	Fri OpenHours `json:"fri"`
 	Sat OpenHours `json:"sat"`
-}
-
-type GeoJson struct {
-	Type        string    `json:"-"`
-	Coordinates []float64 `json:"coordinates"`
 }
 
 type StoreDelivery struct {

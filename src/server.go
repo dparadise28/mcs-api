@@ -1,16 +1,14 @@
 package main
 
 import (
-	//"github.com/julienschmidt/httprouter"
 	"crypto/tls"
-	"flag"
-	//"io/ioutil"
 	"db"
+	"flag"
 	"log"
 	"net/http"
 	"networking"
-	//"os"
 	"time"
+	"tools"
 )
 
 var (
@@ -39,13 +37,14 @@ func InitServer() {
 	flag.StringVar(&db.AuthDatabase, "db_name", "", "Name of the db you would like to connect to")
 	flag.StringVar(&db.MongoDBUri, "mongo_db_uri", "",
 		"example: mongodb://<dbuser>:<dbpassword>@<dbhost1>,<dbhost2>,...:<port>/<dbname>")
+	flag.StringVar(&tools.EmailPassword, "platform_email_pw", "", "Email password.")
 	flag.Parse()
-	if len(port) == 0 || len(db.MongoDBUri) == 0 || len(db.AuthDatabase) == 0 {
+	if len(port) == 0 || len(db.MongoDBUri) == 0 || len(db.AuthDatabase) == 0 || len(tools.EmailPassword) == 0 {
 		panic(`
 			Must provide a port to start the server on, a db uri to connect to
 			and a db name to use.
 
-			ex: go run server.go --port=443 --db_name=test-db --mongo_db_uri=mongodb://...
+			ex: go run server.go --port=443 --db_name=test-db --mongo_db_uri=mongodb://... --platform_email_pw=pa530rd
 		`)
 	}
 }

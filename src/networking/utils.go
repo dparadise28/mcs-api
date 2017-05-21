@@ -31,6 +31,6 @@ func LogExtIp(port string) {
 		// shouldnt stop the server from starting
 		log.Println(err.Error())
 		log.Println("\n\nTrouble Retreiving external ip\n\nSetting Server Address", port)
+		resp.Body.Close()
 	}
-	resp.Body.Close()
 }

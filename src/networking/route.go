@@ -18,6 +18,14 @@ var APIRouteMap = map[string]map[string]interface{}{
 	// products api
 
 	// users api
+	"/user/create": {
+		"control_method": "POST",
+		"handler_method": api.UserCreate,
+	},
+	"/user/confirm/email/:user_id/:confirmation_code": {
+		"control_method": "GET",
+		"handler_method": api.UserConfirmation,
+	},
 
 	// stores api
 	"/store/instance/:store_id": {
