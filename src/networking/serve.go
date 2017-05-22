@@ -1,6 +1,7 @@
 package networking
 
 import (
+	"encoding/json"
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"models"
@@ -24,7 +25,7 @@ func generateAPIEndPoint(fn HandlerMethodType) httprouter.Handle {
 		}()
 		respWrtr.Header().Set("Sec-Websocket-Version", "13")
 		respWrtr.Header().Set("Access-Control-Allow-Origin", "*")
-		respWrtr.Header().Set("Content-Type", "application/json")
+		//respWrtr.Header().Set("Content-Type", "application/json")
 		respWrtr.Header().Set(
 			"Access-Control-Allow-Methods",
 			"GET, OPTION, HEAD, PATCH, PUT, POST, DELETE",
@@ -33,6 +34,13 @@ func generateAPIEndPoint(fn HandlerMethodType) httprouter.Handle {
 		if req.Method == "POST" && req.Body == nil {
 			reqEndTime := time.Now()
 			models.WriteError(respWrtr, models.ErrMissingPayload)
+			log.Printf("[%s] %q %v\n", req.Method, req.URL.String(), reqEndTime.Sub(reqStartTime))
+			return
+		}
+		if req.URL.String() == "/api/docs" {
+			reqEndTime := time.Now()
+			json.NewEncoder(respWrtr).Encode(APIRouteMap)
+			log.Printf("asdkjlfkjfklfklfkfjkffk")
 			log.Printf("[%s] %q %v\n", req.Method, req.URL.String(), reqEndTime.Sub(reqStartTime))
 			return
 		}
@@ -52,13 +60,13 @@ func ServeEndPoints() *httprouter.Router {
 	for end_point, api_end_point := range APIRouteMap {
 		ctrl_method := api_end_point["control_method"].(string)
 		full_end_point := "/api" + end_point
-		handler_method := api_end_point["handler_method"].(func(
+		handler_method := Handles[end_point].(func(
 			http.ResponseWriter,
 			*http.Request,
 			httprouter.Params,
 		))
 
-		log.Println("GENERATING END POINT: ", ctrl_method, ": ", full_end_point)
+		log.Printf("GENERATING END POINT: ", ctrl_method, ": ", full_end_point)
 
 		control_methods[ctrl_method](
 			full_end_point,
