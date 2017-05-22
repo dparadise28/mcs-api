@@ -4,7 +4,7 @@ import "gopkg.in/mgo.v2/bson"
 
 var UserCollectionName = "Users"
 
-type UserAddressBook struct {
+type UserAddress struct {
 	AddressName string  `bson:"address_name" json:"address_name"`
 	Location    GeoJson `bson:"location" json:"location"`
 }
@@ -17,12 +17,16 @@ type UserRoles struct {
 }
 
 type User struct {
-	ID               bson.ObjectId   `bson:"_id,omitempty" json:"user_id"`
-	ConfirmationCode string          `bson:"confirmation_code" json:"confirmation_code"`
-	AddressBook      UserAddressBook `bson:"address_book" json:"address_book"`
-	Confirmed        bool            `bson:"confirmed" json:"confirmed"`
-	Password         string          `bson:"password" json:"password"`
-	UserName         string          `bson:"username" json:"username"`
-	Email            string          `bson:"email" json:"email"`
-	Roles            UserRoles       `bson:"user_roles" json:"user_roles"`
+	ID               bson.ObjectId `bson:"_id,omitempty" json:"user_id"`
+	ConfirmationCode string        `bson:"confirmation_code" json:"confirmation_code"`
+	AddressBook      []UserAddress `bson:"address_book" json:"address_book"`
+	Confirmed        bool          `bson:"confirmed" json:"confirmed"`
+	Password         string        `bson:"password" json:"password" validate:"required"`
+	UserName         string        `bson:"username" json:"username" validate:"required"`
+	Email            string        `bson:"email" json:"email" validate:"required,email"`
+	Roles            UserRoles     `bson:"user_roles" json:"user_roles"`
+}
+
+func (u *User) ScrubSensitiveInfo() {
+	u.Password, u.ConfirmationCode = "", ""
 }

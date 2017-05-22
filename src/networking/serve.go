@@ -3,7 +3,9 @@ package networking
 import (
 	"github.com/julienschmidt/httprouter"
 	"log"
+	"models"
 	"net/http"
+	"time"
 )
 
 // create type for consistent function signatures in routing map
@@ -12,6 +14,14 @@ type ControlMethodType func(string, httprouter.Handle)
 
 func generateAPIEndPoint(fn HandlerMethodType) httprouter.Handle {
 	return func(respWrtr http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		reqStartTime := time.Now()
+		defer func() {
+			if err := recover(); err != nil {
+				reqEndTime := time.Now()
+				log.Printf("[%s] %q %v\n: panic: %+v\n", req.Method, req.URL.String(), reqEndTime.Sub(reqStartTime), err)
+				models.WriteError(respWrtr, models.ErrInternalServer)
+			}
+		}()
 		respWrtr.Header().Set("Sec-Websocket-Version", "13")
 		respWrtr.Header().Set("Access-Control-Allow-Origin", "*")
 		respWrtr.Header().Set("Content-Type", "application/json")
@@ -19,19 +29,16 @@ func generateAPIEndPoint(fn HandlerMethodType) httprouter.Handle {
 			"Access-Control-Allow-Methods",
 			"GET, OPTION, HEAD, PATCH, PUT, POST, DELETE",
 		)
-		if req.Method == "POST" {
-			// A post should contain a request body
-			if req.Body == nil {
-				http.Error(respWrtr, "Please send a request body", 400)
-				return
-			}
+		// A post should contain a request body
+		if req.Method == "POST" && req.Body == nil {
+			reqEndTime := time.Now()
+			models.WriteError(respWrtr, models.ErrMissingPayload)
+			log.Printf("[%s] %q %v\n", req.Method, req.URL.String(), reqEndTime.Sub(reqStartTime))
+			return
 		}
-		log.Printf(
-			"Request for %s (Accept-Encoding: %s)",
-			req.URL.Path,
-			req.Header.Get("Accept-Encoding"),
-		)
 		fn(respWrtr, req, ps)
+		reqEndTime := time.Now()
+		log.Printf("[%s] %q %v\n", req.Method, req.URL.String(), reqEndTime.Sub(reqStartTime))
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"models"
 	"net/http"
+	"tools"
 )
 
 var validate *validator.Validate
@@ -18,23 +19,14 @@ func StoreSearch(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 }
 
 func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	// TODO: move this out of specific calls and into generic
-	// deserialization to avoid code duplication
 	var store models.Store
-	err := json.NewDecoder(r.Body).Decode(&store)
-	if err != nil {
-		http.Error(w, err.Error(), 400)
+	v := new(tools.DefaultValidator)
+	if err := json.NewDecoder(r.Body).Decode(&store); err != nil {
+		models.WriteError(w, models.ErrBadRequest)
 		return
 	}
-
-	validation := validator.New()
-	if err = validation.Struct(&store); err != nil {
-		errors := []string{}
-		for _, validationError := range err.(validator.ValidationErrors) {
-			errors = append(errors, validationError.Namespace())
-		}
-		jsonErr, _ := json.Marshal(errors)
-		http.Error(w, string(jsonErr), 400)
+	if validationErr := v.ValidateIncomingJsonRequest(&store); validationErr.Status != 200 {
+		models.WriteError(w, &validationErr)
 		return
 	}
 
@@ -47,7 +39,7 @@ func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	store.ID = bson.NewObjectId()
 	store.Location.Type = "Point"
 	if insert_err := c.Insert(&store); insert_err != nil {
-		http.Error(w, insert_err.Error(), 400)
+		models.WriteError(w, models.ErrResourceConflict)
 		return
 	}
 	json.NewEncoder(w).Encode(store)

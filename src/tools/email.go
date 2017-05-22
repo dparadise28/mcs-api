@@ -17,7 +17,7 @@ func SendEmailValidation(to string, subject string, body string) (success bool) 
 	m.SetHeader("To", to)
 	m.SetHeader("Subject", subject)
 	m.SetBody("text/html", body)
-	d := gomail.NewDialer("smtp.office365.com", 587, "yourfriends@mycorner.store", "!&GDrmfIX0yYv!Ec")
+	d := gomail.NewDialer("smtp.office365.com", 587, "yourfriends@mycorner.store", EmailPassword)
 	d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 	if err := d.DialAndSend(m); err != nil {
 		log.Println(err)
