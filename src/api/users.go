@@ -14,7 +14,6 @@ import (
 )
 
 func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	//panic("uhoh")
 	var user models.User
 	session := db.Database.Session.Copy()
 	defer session.Close()
@@ -56,31 +55,77 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	user.ID = bson.NewObjectId()
 	user.Confirmed = false
 	user.ConfirmationCode = tools.GenerateConfirmationCode()
-	user.Password = tools.HashPassword(user.Password)
+	//user.Password = tools.HashPassword(user.Password)
+	userPassword := user.Password
+	user.Password = ""
 
 	// copy db session for the stores collection and close on completion
 	session := db.Database.Session.Copy()
-	defer session.Close()
 	c := db.Database.C(models.UserCollectionName).With(session)
 
-	// grab the proper collection, create a new store id and attempt an insert
 	if insert_err := c.Insert(&user); insert_err != nil {
 		models.WriteError(w, models.ErrResourceConflict)
 		return
 	}
-	email_subject := "Thank You for signing up!"
-	email_body := "Welcome! Please click on the following link to confirm your account \n" +
-		"http://mycorner.store:8001/api/user/confirm/email/" +
-		user.ID.Hex() + "/" + user.ConfirmationCode
-	if email_sent := tools.SendEmailValidation(user.Email, email_subject, email_body); !email_sent {
-		unreachable := *models.ErrRequestTimeout
-		unreachable.Details["timeout"] = append(
-			unreachable.Details["timeout"], "Unable to reach the email address provided.",
-		)
-		models.WriteError(w, &unreachable)
-		return
-	}
+	defer session.Close()
+	go func() {
+		defer session.Close()
+		hashedPassword := tools.HashPassword(userPassword)
+		change := mgo.Change{
+			ReturnNew: true,
+			Upsert:    false,
+			Remove:    false,
+			Update: bson.M{
+				"$set": bson.M{
+					"password": hashedPassword,
+				},
+			},
+		}
+		u, _ := c.Find(bson.M{"_id": user.ID}).Apply(change, &user)
+		log.Println(u)
+	}()
 
+	email := user.EmailConfirmation()
+	tools.EmailQueue <- &email
 	user.ScrubSensitiveInfo()
 	json.NewEncoder(w).Encode(user)
+}
+
+func UserInfo(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var user models.User
+	session := db.Database.Session.Copy()
+	defer session.Close()
+
+	c := db.Database.C(models.UserCollectionName).With(session)
+	//c.Find(bson.M{"email": }).One(&user)
+	c.Find(bson.M{"email": r.URL.Query().Get("email")}).One(&user)
+	log.Println(user)
+	json.NewEncoder(w).Encode(user)
+}
+
+func GetUserById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var user models.User
+	session := db.Database.Session.Copy()
+	defer session.Close()
+
+	c := db.Database.C(models.UserCollectionName).With(session)
+	c.Find(bson.M{"_id": bson.ObjectIdHex(ps.ByName("user_id"))}).One(&user)
+	json.NewEncoder(w).Encode(user)
+}
+
+func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var user models.User
+	session := db.Database.Session.Copy()
+	defer session.Close()
+
+	c := db.Database.C(models.UserCollectionName).With(session)
+	c.Find(bson.M{"email": ps.ByName("email")}).One(&user)
+	token, err := user.Roles.GenetateLoginToken()
+	if err != nil {
+		models.WriteError(w, models.ErrInternalServer)
+		return
+	}
+	json.NewEncoder(w).Encode(models.LoginResponse{
+		Token: token,
+	})
 }

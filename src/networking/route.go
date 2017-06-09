@@ -11,11 +11,11 @@ var Handles = map[string]interface{}{
 	"/docs":                                           Info,
 	"/categories":                                     api.Categories,
 	"/user/create":                                    api.UserCreate,
+	"/user/login/:email":                              api.Login,
+	"/user/retrieve/:user_id":                         api.GetUserById,
 	"/user/confirm/email/:user_id/:confirmation_code": api.UserConfirmation,
-	"/store/instance/:store_id":                       api.StoreSearch,
+	"/store/retrieve/:store_id":                       api.GetStoreById,
 	"/store/create":                                   api.StoreCreate,
-	"/store/update/:store_id":                         api.StoreCreate,
-	"/store/categories/:store_id":                     api.StoreCategories,
 	"/transform":                                      tools.RemodelJ,
 }
 
@@ -31,24 +31,23 @@ var APIRouteMap = map[string]map[string]interface{}{
 		"control_method": "POST",
 		"post_payload":   models.User{},
 	},
+	"/user/retrieve/:user_id": {
+		"control_method": "GET",
+	},
+	"/user/login/:email": {
+		"control_method": "GET",
+	},
 	"/user/confirm/email/:user_id/:confirmation_code": {
 		"control_method": "GET",
 	},
 
 	// stores api
-	"/store/instance/:store_id": {
+	"/store/retrieve/:store_id": {
 		"control_method": "GET",
 	},
 	"/store/create": {
 		"control_method": "POST",
 		"post_payload":   models.Store{},
-	},
-	"/store/update/:store_id": {
-		"control_method": "POST",
-		"post_payload":   models.Store{},
-	},
-	"/store/categories/:store_id": {
-		"control_method": "GET",
 	},
 
 	"/transform": {

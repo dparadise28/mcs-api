@@ -40,7 +40,6 @@ func generateAPIEndPoint(fn HandlerMethodType) httprouter.Handle {
 		if req.URL.String() == "/api/docs" {
 			reqEndTime := time.Now()
 			json.NewEncoder(respWrtr).Encode(APIRouteMap)
-			log.Printf("asdkjlfkjfklfklfkfjkffk")
 			log.Printf("[%s] %q %v\n", req.Method, req.URL.String(), reqEndTime.Sub(reqStartTime))
 			return
 		}

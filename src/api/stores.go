@@ -15,7 +15,19 @@ import (
 var validate *validator.Validate
 
 func StoreSearch(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	// TODO write queries and maybe split into different requests
+	// search by location, search by category etc
 	fmt.Println(ps.ByName("store_id"))
+}
+
+func GetStoreById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var store models.Store
+	session := db.Database.Session.Copy()
+	defer session.Close()
+
+	c := db.Database.C(models.StoreCollectionName).With(session)
+	c.Find(bson.M{"_id": bson.ObjectIdHex(ps.ByName("store_id"))}).One(&store)
+	json.NewEncoder(w).Encode(store)
 }
 
 func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -30,15 +42,7 @@ func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		return
 	}
 
-	// copy db session for the stores collection and close on completion
-	session := db.Database.Session.Copy()
-	defer session.Close()
-
-	// grab the proper collection, create a new store id and attempt an insert
-	c := db.Database.C(models.StoreCollectionName).With(session)
-	store.ID = bson.NewObjectId()
-	store.Location.Type = "Point"
-	if insert_err := c.Insert(&store); insert_err != nil {
+	if insert_err := store.Insert(db.Database); insert_err != nil {
 		models.WriteError(w, models.ErrResourceConflict)
 		return
 	}
