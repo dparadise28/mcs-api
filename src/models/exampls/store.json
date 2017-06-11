@@ -1,0 +1,98 @@
+{
+	"tax_rate": 4.5,
+	"platform_categories": [
+		"Restaurants",
+		"Some Other Food Category"
+	],
+	"working_hours": {
+		"wednesday": {
+			"open": true,
+			"hours": {
+				"to": 1200,
+				"from": 900
+			}
+		},
+		"sunday": {
+			"open": true,
+			"hours": {
+				"to": 1200,
+				"from": 900
+			}
+		},
+		"tursday": {
+			"open": true,
+			"hours": {
+				"to": 1200,
+				"from": 900
+			}
+		},
+		"tuesday": {
+			"open": true,
+			"hours": {
+				"to": 1200,
+				"from": 900
+			}
+		},
+		"monday": {
+			"open": true,
+			"hours": {
+				"to": 1200,
+				"from": 900
+			}
+		},
+		"friday": {
+			"open": true,
+			"hours": {
+				"to": 1200,
+				"from": 900
+			}
+		},
+		"saturday": {
+			"open": true,
+			"hours": {
+				"to": 1200,
+				"from": 900
+			}
+		}
+	},
+	"name": "store name",
+	"store_categories": [
+		"Breakfast",
+		"Lunch",
+		"Appetizers",
+		"Dinner",
+		"Desert",
+		"Beverages"
+	],
+	"image": "https://...",
+	"delivery": {
+		"service_offered": true,
+		"delivery_fee": 500,
+		"delivery_minimum": 500,
+		"minimum_time_to_delivery": 45,
+		"maximum_time_to_delivery": 100,
+		"delivery_distance": 2
+	},
+	"phone": "(212) - 123 - 4567",
+	"pickup": {
+		"maximum_time_to_pickup": 30,
+		"offered": true,
+		"minimum_time_to_pickup": 90,
+		"pickup_items": {
+			"min": 1,
+			"max": 100
+		}
+	},
+	"short_description": "some short description with words",
+	"long_description": "some long description with lots of words describing the store. more words",
+	"address": {
+		"administrative_area_level_1": "NY",
+		"country": "USA",
+		"location": {
+			"coordinates": [-73.9505241, 40.5863985]
+		},
+		"postal_code": "11235",
+		"route": "",
+		"street_number": ""
+	}
+}
