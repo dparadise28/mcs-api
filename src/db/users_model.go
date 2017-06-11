@@ -10,7 +10,7 @@ var UserIndex = []mgo.Index{
 	// http://bazaar.launchpad.net/+branch/mgo/v2/view/head:/session.go#L889
 	mgo.Index{
 		Key:        []string{"email"},
-		Unique:     false,
+		Unique:     true,
 		DropDups:   true,
 		Background: true,
 		Sparse:     true,
