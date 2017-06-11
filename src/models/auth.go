@@ -1,50 +1,98 @@
 package models
 
 import (
+	"errors"
 	"github.com/dgrijalva/jwt-go"
-	"gopkg.in/mgo.v2/bson"
-	"log"
+	"golang.org/x/crypto/bcrypt"
+	"net/http"
+	"time"
 )
 
 // perm keys for read write record privelages
 const (
-	OrdersReadWritePerm = "o_rw"
-	OrdersReadPerm      = "o_r"
-	StoreReadWrite      = "s_rw"
-	StoreRead           = "s_r"
-	ProductReadWrite    = "p_rw"
-	ProductRead         = "p_r"
+	ACCESSROLE_OrdersReadWritePerm  = "o_rw"
+	ACCESSROLE_OrdersReadPerm       = "o_r"
+	ACCESSROLE_StoreReadWritePerm   = "s_rw"
+	ACCESSROLE_StoreReadPerm        = "s_r"
+	ACCESSROLE_ProductReadWritePerm = "p_rw"
+	ACCESSROLE_ProductReadPerm      = "p_r"
 
 	// owner = owner of store; admin = access to everything
-	OWNER = "owner"
-	ADMIN = "admin"
+	ACCESSROLE_STOREOWNER     = "owner"
+	ACCESSROLE_ADMIN          = "admin"
+	ACCESSROLE_CONFIRMED_USER = "confirmed"
+
+	UNCONFIRMED_USER = "Unconfirmed User"
+
+	JWT_SIGNATURE = "temp_signiture_key"
+	JWT_ISSUER    = "MCS-API"
 )
 
+func JWT_TTL() int64 {
+	return time.Now().Add(time.Minute * 90).Unix()
+}
+
+func COOKIE_TTL() time.Time {
+	return time.Now().Add(3 * 24 * time.Hour)
+}
+
 type UserRoles struct {
-	ID     bson.ObjectId `bson:"_id,omitempty" json:"user_id"`
-	Access map[bson.ObjectId]string
+	Access map[string]string
 }
 
 type CustomClaims struct {
-	Roles *UserRoles
+	Perms     map[string]string
+	Confirmed bool
 	jwt.StandardClaims
 }
 
-type LoginResponse struct {
-	Token string
-}
-
-func (ur *UserRoles) GenetateLoginToken() (string, error) {
-	// Sign and get the complete encoded token as a string
-	claims := CustomClaims{
-		ur,
-		jwt.StandardClaims{
-			ExpiresAt: 15000,
-			Issuer:    "test",
+func GenerateTokenClaims(access map[string]string, confirmed bool) CustomClaims {
+	return CustomClaims{
+		Perms:     access,
+		Confirmed: confirmed,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: JWT_TTL(),
+			Issuer:    JWT_ISSUER,
 		},
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte("temp_signiture_key"))
-	log.Println(err)
-	return tokenString, err
 }
+
+func (c *CustomClaims) CreateToken() (string, error) {
+	// Sign and get the complete encoded token as a string
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, c)
+	tokenString, tokenErr := token.SignedString([]byte(JWT_SIGNATURE))
+	if tokenErr != nil {
+		return tokenString, tokenErr
+	}
+	return tokenString, tokenErr
+}
+
+func (ur *User) GenetateLoginToken(pw string) (string, error) {
+	if !ur.Confirmed {
+		return "", errors.New(UNCONFIRMED_USER)
+	}
+	err := bcrypt.CompareHashAndPassword([]byte(ur.Password), []byte(pw))
+	if pw == "" || err != nil {
+		return "", errors.New("Unauthorized access")
+	}
+
+	// Sign and get the complete encoded token as a string
+	claims := GenerateTokenClaims(ur.Roles.Access, ur.Confirmed)
+	token, err := claims.CreateToken()
+	return token, err
+}
+
+func (ur *User) UpdateTokenAndCookie(w http.ResponseWriter) (string, error) {
+	// Sign and get the complete encoded token as a string
+	claims := GenerateTokenClaims(ur.Roles.Access, ur.Confirmed)
+	token, err := claims.CreateToken()
+	authCookie := http.Cookie{
+		Name:    "AUTH-TOKEN",
+		Value:   token,
+		Expires: COOKIE_TTL(),
+	}
+	http.SetCookie(w, &authCookie)
+	return token, err
+}
+
+//func (ur *User) GenetateLoginToken(pw string) (string, error) {

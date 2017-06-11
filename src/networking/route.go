@@ -7,22 +7,22 @@ import (
 )
 
 var Handles = map[string]interface{}{
-	"/h2":                                             Info,
-	"/docs":                                           Info,
-	"/categories":                                     api.Categories,
+	//"/h2":                                             Info,
+	//"/docs":                                           Info,
+	//"/categories":                                     api.Categories,
 	"/user/create":                                    api.UserCreate,
-	"/user/login/:email":                              api.Login,
-	"/user/retrieve/:user_id":                         api.GetUserById,
+	"/user/login":                                     api.Login,
+	"/user/retrieve":                                  api.GetUserById,
 	"/user/confirm/email/:user_id/:confirmation_code": api.UserConfirmation,
-	"/store/retrieve/:store_id":                       api.GetStoreById,
+	"/store/retrieve/full/:store_id":                  api.GetStoreById,
 	"/store/create":                                   api.StoreCreate,
 	"/transform":                                      tools.RemodelJ,
 }
 
 var APIRouteMap = map[string]map[string]interface{}{
-	"/h2":         {"control_method": "GET"},
-	"/docs":       {"control_method": "GET"},
-	"/categories": {"control_method": "GET"},
+	//"/h2":         {"control_method": "GET"},
+	//"/docs":       {"control_method": "GET"},
+	//"/categories": {"control_method": "GET"},
 
 	// products api
 
@@ -30,28 +30,42 @@ var APIRouteMap = map[string]map[string]interface{}{
 	"/user/create": {
 		"control_method": "POST",
 		"post_payload":   models.User{},
+		"authenticate":   []string{},
 	},
-	"/user/retrieve/:user_id": {
+	"/user/retrieve": {
 		"control_method": "GET",
+		"authenticate": []string{
+			models.ACCESSROLE_CONFIRMED_USER,
+		},
 	},
-	"/user/login/:email": {
+	"/user/login": {
 		"control_method": "GET",
+		"authenticate":   []string{},
 	},
 	"/user/confirm/email/:user_id/:confirmation_code": {
 		"control_method": "GET",
+		"authenticate":   []string{},
 	},
 
 	// stores api
-	"/store/retrieve/:store_id": {
+	"/store/retrieve/full/:store_id": {
 		"control_method": "GET",
+		"authenticate": []string{
+			models.ACCESSROLE_CONFIRMED_USER,
+			models.ACCESSROLE_STOREOWNER,
+		},
 	},
 	"/store/create": {
 		"control_method": "POST",
 		"post_payload":   models.Store{},
+		"authenticate": []string{
+			models.ACCESSROLE_CONFIRMED_USER,
+		},
 	},
 
 	"/transform": {
 		"control_method": "GET",
 		"post_payload":   models.User{},
+		"authenticate":   []string{},
 	},
 }

@@ -1,7 +1,6 @@
 package networking
 
 import (
-	"encoding/json"
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"models"
@@ -13,39 +12,49 @@ import (
 type HandlerMethodType func(http.ResponseWriter, *http.Request, httprouter.Params)
 type ControlMethodType func(string, httprouter.Handle)
 
-func generateAPIEndPoint(fn HandlerMethodType) httprouter.Handle {
+func generateAPIEndPoint(fn HandlerMethodType, fullEndPoint string) httprouter.Handle {
 	return func(respWrtr http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 		reqStartTime := time.Now()
 		defer func() {
 			if err := recover(); err != nil {
 				reqEndTime := time.Now()
-				log.Printf("[%s] %q %v\n: panic: %+v\n", req.Method, req.URL.String(), reqEndTime.Sub(reqStartTime), err)
+				log.Printf("[%s] %s %s %v\n: panic: %+v\n",
+					req.Method,
+					req.URL.String(),
+					fullEndPoint,
+					reqEndTime.Sub(reqStartTime),
+					err,
+				)
 				models.WriteError(respWrtr, models.ErrInternalServer)
 			}
 		}()
-		respWrtr.Header().Set("Sec-Websocket-Version", "13")
-		respWrtr.Header().Set("Access-Control-Allow-Origin", "*")
-		//respWrtr.Header().Set("Content-Type", "application/json")
-		respWrtr.Header().Set(
-			"Access-Control-Allow-Methods",
-			"GET, OPTION, HEAD, PATCH, PUT, POST, DELETE",
-		)
+
+		SetBaseHeaders(respWrtr) // found in network/security
 		// A post should contain a request body
 		if req.Method == "POST" && req.Body == nil {
 			reqEndTime := time.Now()
 			models.WriteError(respWrtr, models.ErrMissingPayload)
-			log.Printf("[%s] %q %v\n", req.Method, req.URL.String(), reqEndTime.Sub(reqStartTime))
+			log.Printf("[%s] %s %s %v\n", req.Method, req.URL.String(), fullEndPoint, reqEndTime.Sub(reqStartTime))
 			return
 		}
-		if req.URL.String() == "/api/docs" {
+		/*if req.URL.String() == "/api/docs" {
 			reqEndTime := time.Now()
 			json.NewEncoder(respWrtr).Encode(APIRouteMap)
-			log.Printf("[%s] %q %v\n", req.Method, req.URL.String(), reqEndTime.Sub(reqStartTime))
+			log.Printf("[%s] %q %v\n", req.Method, req.URL.String(), fullEndPoint, reqEndTime.Sub(reqStartTime))
 			return
+		}*/
+		ep := fullEndPoint[4:]
+		if len(APIRouteMap[ep]["authenticate"].([]string)) != 0 {
+			if valid, errJSON := ValidatedToken(respWrtr, req, ps, ep); !valid {
+				models.WriteError(respWrtr, errJSON)
+				reqEndTime := time.Now()
+				log.Printf("[%s] :UNAUTHORIZED: %s %q %v\n", req.Method, req.URL.String(), fullEndPoint, reqEndTime.Sub(reqStartTime))
+				return
+			}
 		}
 		fn(respWrtr, req, ps)
-		reqEndTime := time.Now()
-		log.Printf("[%s] %q %v\n", req.Method, req.URL.String(), reqEndTime.Sub(reqStartTime))
+		//reqEndTime := time.Now()
+		//log.Printf("[%s] %s %q %v\n", req.Method, req.URL.String(), fullEndPoint, reqEndTime.Sub(reqStartTime))
 	}
 }
 
@@ -58,18 +67,18 @@ func ServeEndPoints() *httprouter.Router {
 	}
 	for end_point, api_end_point := range APIRouteMap {
 		ctrl_method := api_end_point["control_method"].(string)
-		full_end_point := "/api" + end_point
+		fullEndPoint := "/api" + end_point
 		handler_method := Handles[end_point].(func(
 			http.ResponseWriter,
 			*http.Request,
 			httprouter.Params,
 		))
 
-		log.Printf("GENERATING END POINT: ", ctrl_method, ": ", full_end_point)
+		log.Printf("GENERATING END POINT: ", ctrl_method, ": ", fullEndPoint)
 
 		control_methods[ctrl_method](
-			full_end_point,
-			generateAPIEndPoint(handler_method),
+			fullEndPoint,
+			generateAPIEndPoint(handler_method, fullEndPoint),
 		)
 	}
 	return router

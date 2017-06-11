@@ -46,5 +46,6 @@ func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		models.WriteError(w, models.ErrResourceConflict)
 		return
 	}
+	UserSetStoreOwnerPerms(w, r, store.ID.Hex())
 	json.NewEncoder(w).Encode(store)
 }

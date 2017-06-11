@@ -35,9 +35,30 @@ var (
 			},
 		},
 	}
+	ErrUnauthorizedAccess = &Error{
+		"bad_request", 403, "Unauthorized Access", map[string][]string{
+			"unauthorized": []string{
+				"Unauthorized Access",
+			},
+		},
+	}
+	ErrExpiredJWToken = &Error{
+		"bad_request", 403, "Expired Token", map[string][]string{
+			"expired": []string{
+				"Please log back",
+			},
+		},
+	}
+	ErrUnconfirmedUser = &Error{
+		"bad_request", 403, "Unauthorized Access", map[string][]string{
+			"unauthorize": []string{
+				"Please Confirm Your Email Address",
+			},
+		},
+	}
 	ErrBadRequest = &Error{
 		"bad_request", 400, "Bad request", map[string][]string{
-			"timeout": []string{
+			"malformed": []string{
 				"Malformed request body.",
 			},
 		},

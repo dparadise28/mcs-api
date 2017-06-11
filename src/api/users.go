@@ -29,15 +29,40 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 			},
 		},
 	}
-	info, err := c.Find(bson.M{
+	info, _ := c.Find(bson.M{
 		"_id":               bson.ObjectIdHex(ps.ByName("user_id")),
 		"confirmation_code": ps.ByName("confirmation_code"),
 	}).Apply(change, &user)
 
 	user.ScrubSensitiveInfo()
-	log.Println(err)
 	log.Println(info)
 	json.NewEncoder(w).Encode(user)
+}
+
+func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId string) {
+	var user models.User
+	session := db.Database.Session.Copy()
+	defer session.Close()
+
+	c := db.Database.C(models.UserCollectionName).With(session)
+	change := mgo.Change{
+		ReturnNew: true,
+		Upsert:    false,
+		Remove:    false,
+		Update: bson.M{
+			"$set": bson.M{
+				"user_roles.access." + storeId: models.ACCESSROLE_STOREOWNER,
+			},
+		},
+	}
+	uid, _ := r.Cookie("UID")
+	info, _ := c.Find(bson.M{
+		"_id": bson.ObjectIdHex(uid.Value),
+	}).Apply(change, &user)
+	user.UpdateTokenAndCookie(w)
+
+	user.ScrubSensitiveInfo()
+	log.Println(info)
 }
 
 func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -55,24 +80,21 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	user.ID = bson.NewObjectId()
 	user.Confirmed = false
 	user.ConfirmationCode = tools.GenerateConfirmationCode()
-	//user.Password = tools.HashPassword(user.Password)
 	userPassword := user.Password
 	user.Password = ""
 
 	// copy db session for the stores collection and close on completion
 	session := db.Database.Session.Copy()
 	c := db.Database.C(models.UserCollectionName).With(session)
-
 	if insert_err := c.Insert(&user); insert_err != nil {
 		models.WriteError(w, models.ErrResourceConflict)
 		return
 	}
-	defer session.Close()
 	go func() {
 		defer session.Close()
 		hashedPassword := tools.HashPassword(userPassword)
 		change := mgo.Change{
-			ReturnNew: true,
+			ReturnNew: false,
 			Upsert:    false,
 			Remove:    false,
 			Update: bson.M{
@@ -81,8 +103,9 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 				},
 			},
 		}
-		u, _ := c.Find(bson.M{"_id": user.ID}).Apply(change, &user)
-		log.Println(u)
+		if _, err := c.Find(bson.M{"_id": user.ID}).Apply(change, &user); err != nil {
+			log.Printf(err.Error())
+		}
 	}()
 
 	email := user.EmailConfirmation()
@@ -92,40 +115,34 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 }
 
 func UserInfo(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	var user models.User
-	session := db.Database.Session.Copy()
-	defer session.Close()
-
-	c := db.Database.C(models.UserCollectionName).With(session)
-	//c.Find(bson.M{"email": }).One(&user)
-	c.Find(bson.M{"email": r.URL.Query().Get("email")}).One(&user)
-	log.Println(user)
+	var user models.UserAPIResponse
+	user.GetByEmail(db.Database, ps.ByName("email"))
 	json.NewEncoder(w).Encode(user)
 }
 
 func GetUserById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	var user models.User
-	session := db.Database.Session.Copy()
-	defer session.Close()
-
-	c := db.Database.C(models.UserCollectionName).With(session)
-	c.Find(bson.M{"_id": bson.ObjectIdHex(ps.ByName("user_id"))}).One(&user)
+	var user models.UserAPIResponse
+	uid, _ := r.Cookie("UID")
+	user.GetByIdStr(db.Database, uid.Value)
 	json.NewEncoder(w).Encode(user)
 }
 
 func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var user models.User
-	session := db.Database.Session.Copy()
-	defer session.Close()
-
-	c := db.Database.C(models.UserCollectionName).With(session)
-	c.Find(bson.M{"email": ps.ByName("email")}).One(&user)
-	token, err := user.Roles.GenetateLoginToken()
+	user.GetByEmail(db.Database, r.URL.Query().Get("email"))
+	token, err := user.GenetateLoginToken(r.URL.Query().Get("password"))
 	if err != nil {
-		models.WriteError(w, models.ErrInternalServer)
+		if err.Error() == models.UNCONFIRMED_USER {
+			models.WriteError(w, models.ErrUnconfirmedUser)
+			return
+		}
+		models.WriteError(w, models.ErrUnauthorizedAccess)
 		return
 	}
-	json.NewEncoder(w).Encode(models.LoginResponse{
-		Token: token,
-	})
+	uidCookie := http.Cookie{Name: "UID", Value: user.ID.Hex(), Expires: models.COOKIE_TTL(), Path: "/api"}
+	http.SetCookie(w, &uidCookie)
+	authCookie := http.Cookie{Name: "AUTH-TOKEN", Value: token, Expires: models.COOKIE_TTL(), Path: "/api"}
+	http.SetCookie(w, &authCookie)
+	user.ScrubSensitiveInfo()
+	json.NewEncoder(w).Encode(user)
 }
