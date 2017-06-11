@@ -34,6 +34,15 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		"confirmation_code": ps.ByName("confirmation_code"),
 	}).Apply(change, &user)
 
+	updatedClaims := models.GenerateTokenClaims(user.Roles.Access, user.Confirmed)
+	updatedToken, _ := updatedClaims.CreateToken()
+	authCookie := http.Cookie{
+		Name:    "AUTH-TOKEN",
+		Path:    "/api",
+		Value:   updatedToken,
+		Expires: models.COOKIE_TTL(),
+	}
+	http.SetCookie(w, &authCookie)
 	user.ScrubSensitiveInfo()
 	log.Println(info)
 	json.NewEncoder(w).Encode(user)
@@ -108,6 +117,17 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		}
 	}()
 
+	updatedClaims := models.GenerateTokenClaims(user.Roles.Access, user.Confirmed)
+	updatedToken, _ := updatedClaims.CreateToken()
+	authCookie := http.Cookie{
+		Name:    "AUTH-TOKEN",
+		Path:    "/api",
+		Value:   updatedToken,
+		Expires: models.COOKIE_TTL(),
+	}
+	http.SetCookie(w, &authCookie)
+	uidCookie := http.Cookie{Name: "UID", Value: user.ID.Hex(), Expires: models.COOKIE_TTL(), Path: "/api"}
+	http.SetCookie(w, &uidCookie)
 	email := user.EmailConfirmation()
 	tools.EmailQueue <- &email
 	user.ScrubSensitiveInfo()

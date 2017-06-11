@@ -8,7 +8,7 @@ import (
 
 var Handles = map[string]interface{}{
 	//"/h2":                                             Info,
-	//"/docs":                                           Info,
+	"/docs": Docs,
 	//"/categories":                                     api.Categories,
 	"/user/create":                                    api.UserCreate,
 	"/user/login":                                     api.Login,
@@ -21,7 +21,7 @@ var Handles = map[string]interface{}{
 
 var APIRouteMap = map[string]map[string]interface{}{
 	//"/h2":         {"control_method": "GET"},
-	//"/docs":       {"control_method": "GET"},
+	"/docs": {"control_method": "GET", "authenticate": []string{}},
 	//"/categories": {"control_method": "GET"},
 
 	// products api

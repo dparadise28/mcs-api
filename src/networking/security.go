@@ -22,6 +22,10 @@ func SetBaseHeaders(respWrtr http.ResponseWriter) {
 func ValidatedToken(w http.ResponseWriter, r *http.Request, ps hr.Params, ep string) (bool, *models.Error) {
 	// ps (http router params); ep (endpoint found in src/networking/route.go::APIRouteMap)
 	tokenStr, e := r.Cookie("AUTH-TOKEN")
+	if e != nil {
+		log.Println("Missing Token")
+		return false, models.ErrUnauthorizedAccess
+	}
 	log.Println(tokenStr, e)
 	token, err := jwt.ParseWithClaims(tokenStr.Value, &models.CustomClaims{},
 		func(token *jwt.Token) (interface{}, error) {

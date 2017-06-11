@@ -3,6 +3,7 @@ package networking
 import (
 	"fmt"
 	//"log"
+	"encoding/json"
 	"github.com/julienschmidt/httprouter"
 	"net/http"
 )
@@ -19,4 +20,8 @@ func Info(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	fmt.Fprintf(w, "TLS: %#v\n", r.TLS)
 	fmt.Fprintf(w, "\nHeaders:\n")
 	r.Header.Write(w)
+}
+
+func Docs(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	json.NewEncoder(w).Encode(APIRouteMap)
 }

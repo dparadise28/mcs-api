@@ -37,12 +37,6 @@ func generateAPIEndPoint(fn HandlerMethodType, fullEndPoint string) httprouter.H
 			log.Printf("[%s] %s %s %v\n", req.Method, req.URL.String(), fullEndPoint, reqEndTime.Sub(reqStartTime))
 			return
 		}
-		/*if req.URL.String() == "/api/docs" {
-			reqEndTime := time.Now()
-			json.NewEncoder(respWrtr).Encode(APIRouteMap)
-			log.Printf("[%s] %q %v\n", req.Method, req.URL.String(), fullEndPoint, reqEndTime.Sub(reqStartTime))
-			return
-		}*/
 		ep := fullEndPoint[4:]
 		if len(APIRouteMap[ep]["authenticate"].([]string)) != 0 {
 			if valid, errJSON := ValidatedToken(respWrtr, req, ps, ep); !valid {
@@ -53,8 +47,8 @@ func generateAPIEndPoint(fn HandlerMethodType, fullEndPoint string) httprouter.H
 			}
 		}
 		fn(respWrtr, req, ps)
-		//reqEndTime := time.Now()
-		//log.Printf("[%s] %s %q %v\n", req.Method, req.URL.String(), fullEndPoint, reqEndTime.Sub(reqStartTime))
+		reqEndTime := time.Now()
+		log.Printf("[%s] %s %q %v\n", req.Method, req.URL.String(), fullEndPoint, reqEndTime.Sub(reqStartTime))
 	}
 }
 
