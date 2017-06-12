@@ -29,7 +29,7 @@ const (
 )
 
 func JWT_TTL() int64 {
-	return time.Now().Add(time.Minute * 90).Unix()
+	return time.Now().Add(time.Minute * 60 * 24 * 15).Unix()
 }
 
 func COOKIE_TTL() time.Time {

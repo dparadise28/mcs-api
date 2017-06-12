@@ -22,6 +22,11 @@ type User struct {
 	Email            string        `bson:"email" json:"email" validate:"required,email"`
 	Roles            UserRoles     `bson:"user_roles" json:"user_roles"`
 	// user roles struct is in /src/models/auth
+
+	Login struct {
+		Token string        `bson:"-" json:"AUTH-TOKEN"`
+		UID   bson.ObjectId `bson:"-" json:"UID"`
+	} `bson:"-" json:"login"`
 }
 
 type UserAPIResponse struct {

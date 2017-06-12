@@ -17,6 +17,7 @@ func SetBaseHeaders(respWrtr http.ResponseWriter) {
 	respWrtr.Header().Set("Access-Control-Allow-Origin", "*")
 	respWrtr.Header().Set("Content-Type", "application/json")
 	respWrtr.Header().Set("Access-Control-Allow-Methods", AccessControlAllowMethods)
+	respWrtr.Header().Set("Access-Control-Allow-Credentials", "true")
 }
 
 func ValidatedToken(w http.ResponseWriter, r *http.Request, ps hr.Params, ep string) (bool, *models.Error) {
@@ -63,7 +64,7 @@ func ValidatedToken(w http.ResponseWriter, r *http.Request, ps hr.Params, ep str
 			updatedToken, _ := updatedClaims.CreateToken()
 			authCookie := http.Cookie{
 				Name:    "AUTH-TOKEN",
-				Path:    "/api",
+				Path:    "/",
 				Value:   updatedToken,
 				Expires: models.COOKIE_TTL(),
 			}

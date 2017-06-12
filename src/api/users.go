@@ -121,13 +121,16 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	updatedToken, _ := updatedClaims.CreateToken()
 	authCookie := http.Cookie{
 		Name:    "AUTH-TOKEN",
-		Path:    "/api",
+		Path:    "/",
 		Value:   updatedToken,
 		Expires: models.COOKIE_TTL(),
 	}
 	http.SetCookie(w, &authCookie)
 	uidCookie := http.Cookie{Name: "UID", Value: user.ID.Hex(), Expires: models.COOKIE_TTL(), Path: "/api"}
 	http.SetCookie(w, &uidCookie)
+
+	user.Login.Token = updatedToken
+	user.Login.UID = user.ID
 	email := user.EmailConfirmation()
 	tools.EmailQueue <- &email
 	user.ScrubSensitiveInfo()
@@ -159,10 +162,12 @@ func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		models.WriteError(w, models.ErrUnauthorizedAccess)
 		return
 	}
-	uidCookie := http.Cookie{Name: "UID", Value: user.ID.Hex(), Expires: models.COOKIE_TTL(), Path: "/api"}
+	uidCookie := http.Cookie{Name: "UID", Value: user.ID.Hex(), Expires: models.COOKIE_TTL(), Path: "/"}
 	http.SetCookie(w, &uidCookie)
-	authCookie := http.Cookie{Name: "AUTH-TOKEN", Value: token, Expires: models.COOKIE_TTL(), Path: "/api"}
+	authCookie := http.Cookie{Name: "AUTH-TOKEN", Value: token, Expires: models.COOKIE_TTL(), Path: "/"}
 	http.SetCookie(w, &authCookie)
 	user.ScrubSensitiveInfo()
+	user.Login.Token = token
+	user.Login.UID = user.ID
 	json.NewEncoder(w).Encode(user)
 }
