@@ -26,6 +26,10 @@ const (
 
 	JWT_SIGNATURE = "temp_signiture_key"
 	JWT_ISSUER    = "MCS-API"
+
+	JWT_COOKIE_NAME    = "authtoken"
+	USERID_COOKIE_NAME = "userID"
+	USERID_HEADER_NAME = USERID_COOKIE_NAME
 )
 
 func JWT_TTL() int64 {
@@ -87,7 +91,7 @@ func (ur *User) UpdateTokenAndCookie(w http.ResponseWriter) (string, error) {
 	claims := GenerateTokenClaims(ur.Roles.Access, ur.Confirmed)
 	token, err := claims.CreateToken()
 	authCookie := http.Cookie{
-		Name:    "AUTH-TOKEN",
+		Name:    JWT_COOKIE_NAME,
 		Value:   token,
 		Expires: COOKIE_TTL(),
 	}

@@ -37,8 +37,8 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	updatedClaims := models.GenerateTokenClaims(user.Roles.Access, user.Confirmed)
 	updatedToken, _ := updatedClaims.CreateToken()
 	authCookie := http.Cookie{
-		Name:    "AUTH-TOKEN",
-		Path:    "/api",
+		Name:    models.JWT_COOKIE_NAME,
+		Path:    "/",
 		Value:   updatedToken,
 		Expires: models.COOKIE_TTL(),
 	}
@@ -120,13 +120,13 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	updatedClaims := models.GenerateTokenClaims(user.Roles.Access, user.Confirmed)
 	updatedToken, _ := updatedClaims.CreateToken()
 	authCookie := http.Cookie{
-		Name:    "AUTH-TOKEN",
+		Name:    models.JWT_COOKIE_NAME,
 		Path:    "/",
 		Value:   updatedToken,
 		Expires: models.COOKIE_TTL(),
 	}
 	http.SetCookie(w, &authCookie)
-	uidCookie := http.Cookie{Name: "UID", Value: user.ID.Hex(), Expires: models.COOKIE_TTL(), Path: "/api"}
+	uidCookie := http.Cookie{Name: models.USERID_COOKIE_NAME, Value: user.ID.Hex(), Expires: models.COOKIE_TTL(), Path: "/api"}
 	http.SetCookie(w, &uidCookie)
 
 	user.Login.Token = updatedToken
@@ -145,7 +145,7 @@ func UserInfo(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 func GetUserById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var user models.UserAPIResponse
-	uid, _ := r.Cookie("UID")
+	uid, _ := r.Cookie(models.USERID_COOKIE_NAME)
 	user.GetByIdStr(db.Database, uid.Value)
 	json.NewEncoder(w).Encode(user)
 }
@@ -162,9 +162,19 @@ func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		models.WriteError(w, models.ErrUnauthorizedAccess)
 		return
 	}
-	uidCookie := http.Cookie{Name: "UID", Value: user.ID.Hex(), Expires: models.COOKIE_TTL(), Path: "/"}
+	uidCookie := http.Cookie{
+		Name:    models.USERID_COOKIE_NAME,
+		Value:   user.ID.Hex(),
+		Expires: models.COOKIE_TTL(),
+		Path:    "/",
+	}
 	http.SetCookie(w, &uidCookie)
-	authCookie := http.Cookie{Name: "AUTH-TOKEN", Value: token, Expires: models.COOKIE_TTL(), Path: "/"}
+	authCookie := http.Cookie{
+		Name:    models.JWT_COOKIE_NAME,
+		Value:   token,
+		Expires: models.COOKIE_TTL(),
+		Path:    "/",
+	}
 	http.SetCookie(w, &authCookie)
 	user.ScrubSensitiveInfo()
 	user.Login.Token = token

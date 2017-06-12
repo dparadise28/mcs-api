@@ -24,8 +24,8 @@ type User struct {
 	// user roles struct is in /src/models/auth
 
 	Login struct {
-		Token string        `bson:"-" json:"AUTH-TOKEN"`
-		UID   bson.ObjectId `bson:"-" json:"UID"`
+		Token string        `bson:"-" json:"authtoken"`
+		UID   bson.ObjectId `bson:"-" json:"userID"`
 	} `bson:"-" json:"login"`
 }
 
