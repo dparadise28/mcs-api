@@ -69,13 +69,7 @@ func ValidatedToken(w http.ResponseWriter, r *http.Request, ps hr.Params, ep str
 			// checks pass so lets update the token with the new expiration time
 			updatedClaims := models.GenerateTokenClaims(claims.Perms, claims.Confirmed)
 			updatedToken, _ := updatedClaims.CreateToken()
-			authCookie := http.Cookie{
-				Name:    models.JWT_COOKIE_NAME,
-				Path:    "/",
-				Value:   updatedToken,
-				Expires: models.COOKIE_TTL(),
-			}
-			http.SetCookie(w, &authCookie)
+			w.Header().Set(models.JWT_COOKIE_NAME, updatedToken)
 			return true, models.ErrSuccess
 		} else {
 			log.Println("InvalidToken: ", token, tokenStr)

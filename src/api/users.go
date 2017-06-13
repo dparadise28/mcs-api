@@ -33,10 +33,7 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		"confirmation_code": ps.ByName("confirmation_code"),
 	}).Apply(change, &user)
 
-	updatedClaims := models.GenerateTokenClaims(user.Roles.Access, user.Confirmed)
-	updatedToken, _ := updatedClaims.CreateToken()
-	w.Header().Set(models.JWT_COOKIE_NAME, updatedToken)
-	w.Header().Set(models.USERID_COOKIE_NAME, user.ID.Hex())
+	user.UpdateTokenAndCookie(w)
 	user.ScrubSensitiveInfo()
 	log.Println(info)
 	json.NewEncoder(w).Encode(user)
@@ -63,7 +60,6 @@ func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId stri
 		"_id": bson.ObjectIdHex(uid.Value),
 	}).Apply(change, &user)
 	user.UpdateTokenAndCookie(w)
-
 	user.ScrubSensitiveInfo()
 	log.Println(info)
 }
@@ -111,13 +107,7 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		}
 	}()
 
-	updatedClaims := models.GenerateTokenClaims(user.Roles.Access, user.Confirmed)
-	updatedToken, _ := updatedClaims.CreateToken()
-	w.Header().Set(models.JWT_COOKIE_NAME, updatedToken)
-	w.Header().Set(models.USERID_COOKIE_NAME, user.ID.Hex())
-
-	user.Login.Token = updatedToken
-	user.Login.UID = user.ID
+	user.UpdateTokenAndCookie(w)
 	email := user.EmailConfirmation()
 	tools.EmailQueue <- &email
 	user.ScrubSensitiveInfo()
@@ -140,7 +130,7 @@ func GetUserById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var user models.User
 	user.GetByEmail(db.Database, r.URL.Query().Get("email"))
-	token, err := user.GenetateLoginToken(r.URL.Query().Get("password"))
+	_, err := user.GenetateLoginTokenAndSetHeaders(r.URL.Query().Get("password"), w)
 	if err != nil {
 		if err.Error() == models.UNCONFIRMED_USER {
 			models.WriteError(w, models.ErrUnconfirmedUser)
@@ -149,10 +139,6 @@ func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		models.WriteError(w, models.ErrUnauthorizedAccess)
 		return
 	}
-	w.Header().Set(models.JWT_COOKIE_NAME, token)
-	w.Header().Set(models.USERID_COOKIE_NAME, user.ID.Hex())
 	user.ScrubSensitiveInfo()
-	user.Login.Token = token
-	user.Login.UID = user.ID
 	json.NewEncoder(w).Encode(user)
 }

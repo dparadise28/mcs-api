@@ -80,23 +80,35 @@ func (ur *User) GenetateLoginToken(pw string) (string, error) {
 		return "", errors.New("Unauthorized access")
 	}
 
-	// Sign and get the complete encoded token as a string
+	token, err := ur.UpdateToken()
+	return token, err
+}
+
+func (ur *User) GenetateLoginTokenAndSetHeaders(pw string, w http.ResponseWriter) (string, error) {
+	if !ur.Confirmed {
+		return "", errors.New(UNCONFIRMED_USER)
+	}
+	err := bcrypt.CompareHashAndPassword([]byte(ur.Password), []byte(pw))
+	if pw == "" || err != nil {
+		return "", errors.New("Unauthorized access")
+	}
+
+	token, err := ur.UpdateTokenAndCookie(w)
+	return token, err
+}
+
+func (ur *User) UpdateToken() (string, error) {
 	claims := GenerateTokenClaims(ur.Roles.Access, ur.Confirmed)
 	token, err := claims.CreateToken()
+
+	ur.Login.Token = token
+	ur.Login.UID = ur.ID
 	return token, err
 }
 
 func (ur *User) UpdateTokenAndCookie(w http.ResponseWriter) (string, error) {
-	// Sign and get the complete encoded token as a string
-	claims := GenerateTokenClaims(ur.Roles.Access, ur.Confirmed)
-	token, err := claims.CreateToken()
-	authCookie := http.Cookie{
-		Name:    JWT_COOKIE_NAME,
-		Value:   token,
-		Expires: COOKIE_TTL(),
-	}
-	http.SetCookie(w, &authCookie)
+	token, err := ur.UpdateToken()
+	w.Header().Set(JWT_COOKIE_NAME, token)
+	w.Header().Set(USERID_COOKIE_NAME, ur.ID.Hex())
 	return token, err
 }
-
-//func (ur *User) GenetateLoginToken(pw string) (string, error) {
