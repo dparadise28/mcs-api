@@ -2,8 +2,8 @@ package networking
 
 import (
 	"github.com/dgrijalva/jwt-go"
-	//"github.com/dgrijalva/jwt-go/request"
 	hr "github.com/julienschmidt/httprouter"
+	"github.com/rs/cors"
 	"log"
 	"models"
 	"net/http"
@@ -12,22 +12,30 @@ import (
 
 var AccessControlAllowMethods = "GET, OPTION, HEAD, PATCH, PUT, POST, DELETE"
 
-func SetBaseHeaders(respWrtr http.ResponseWriter) {
+func SetBaseHeaders(respWrtr http.ResponseWriter, req *http.Request) {
 	respWrtr.Header().Set("Sec-Websocket-Version", "13")
-	respWrtr.Header().Set("Access-Control-Allow-Origin", "*")
+	respWrtr.Header().Set("Access-Control-Allow-Origin", req.Header.Get("Origin"))
 	respWrtr.Header().Set("Content-Type", "application/json")
 	respWrtr.Header().Set("Access-Control-Allow-Methods", AccessControlAllowMethods)
+	respWrtr.Header().Set("Access-Control-Allow-Credentials", "true")
+	respWrtr.Header().Set(
+		"Access-Control-Allow-Headers",
+		"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Requested-With, userID, authtoken",
+	)
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{req.Header.Get("Origin")},
+	})
+	c.HandlerFunc(respWrtr, req)
 }
 
 func ValidatedToken(w http.ResponseWriter, r *http.Request, ps hr.Params, ep string) (bool, *models.Error) {
-	// ps (http router params); ep (endpoint found in src/networking/route.go::APIRouteMap)
-	tokenStr, e := r.Cookie("AUTH-TOKEN")
-	if e != nil {
+	tokenStr := r.Header.Get(models.JWT_COOKIE_NAME)
+	if tokenStr == "" {
 		log.Println("Missing Token")
 		return false, models.ErrUnauthorizedAccess
 	}
-	log.Println(tokenStr, e)
-	token, err := jwt.ParseWithClaims(tokenStr.Value, &models.CustomClaims{},
+	log.Println(tokenStr)
+	token, err := jwt.ParseWithClaims(tokenStr, &models.CustomClaims{},
 		func(token *jwt.Token) (interface{}, error) {
 			return []byte(models.JWT_SIGNATURE), nil
 		},
@@ -61,13 +69,7 @@ func ValidatedToken(w http.ResponseWriter, r *http.Request, ps hr.Params, ep str
 			// checks pass so lets update the token with the new expiration time
 			updatedClaims := models.GenerateTokenClaims(claims.Perms, claims.Confirmed)
 			updatedToken, _ := updatedClaims.CreateToken()
-			authCookie := http.Cookie{
-				Name:    "AUTH-TOKEN",
-				Path:    "/api",
-				Value:   updatedToken,
-				Expires: models.COOKIE_TTL(),
-			}
-			http.SetCookie(w, &authCookie)
+			w.Header().Set(models.JWT_COOKIE_NAME, updatedToken)
 			return true, models.ErrSuccess
 		} else {
 			log.Println("InvalidToken: ", token, tokenStr)

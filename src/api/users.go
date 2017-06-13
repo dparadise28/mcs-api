@@ -4,7 +4,6 @@ import (
 	"db"
 	"encoding/json"
 	"github.com/julienschmidt/httprouter"
-	//"gopkg.in/go-playground/validator.v9"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"log"
@@ -34,15 +33,7 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		"confirmation_code": ps.ByName("confirmation_code"),
 	}).Apply(change, &user)
 
-	updatedClaims := models.GenerateTokenClaims(user.Roles.Access, user.Confirmed)
-	updatedToken, _ := updatedClaims.CreateToken()
-	authCookie := http.Cookie{
-		Name:    "AUTH-TOKEN",
-		Path:    "/api",
-		Value:   updatedToken,
-		Expires: models.COOKIE_TTL(),
-	}
-	http.SetCookie(w, &authCookie)
+	user.UpdateTokenAndCookie(w)
 	user.ScrubSensitiveInfo()
 	log.Println(info)
 	json.NewEncoder(w).Encode(user)
@@ -69,7 +60,6 @@ func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId stri
 		"_id": bson.ObjectIdHex(uid.Value),
 	}).Apply(change, &user)
 	user.UpdateTokenAndCookie(w)
-
 	user.ScrubSensitiveInfo()
 	log.Println(info)
 }
@@ -117,17 +107,7 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		}
 	}()
 
-	updatedClaims := models.GenerateTokenClaims(user.Roles.Access, user.Confirmed)
-	updatedToken, _ := updatedClaims.CreateToken()
-	authCookie := http.Cookie{
-		Name:    "AUTH-TOKEN",
-		Path:    "/api",
-		Value:   updatedToken,
-		Expires: models.COOKIE_TTL(),
-	}
-	http.SetCookie(w, &authCookie)
-	uidCookie := http.Cookie{Name: "UID", Value: user.ID.Hex(), Expires: models.COOKIE_TTL(), Path: "/api"}
-	http.SetCookie(w, &uidCookie)
+	user.UpdateTokenAndCookie(w)
 	email := user.EmailConfirmation()
 	tools.EmailQueue <- &email
 	user.ScrubSensitiveInfo()
@@ -142,15 +122,15 @@ func UserInfo(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 func GetUserById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var user models.UserAPIResponse
-	uid, _ := r.Cookie("UID")
-	user.GetByIdStr(db.Database, uid.Value)
+	uid := r.Header.Get(models.USERID_COOKIE_NAME)
+	user.GetByIdStr(db.Database, uid)
 	json.NewEncoder(w).Encode(user)
 }
 
 func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var user models.User
 	user.GetByEmail(db.Database, r.URL.Query().Get("email"))
-	token, err := user.GenetateLoginToken(r.URL.Query().Get("password"))
+	_, err := user.GenetateLoginTokenAndSetHeaders(r.URL.Query().Get("password"), w)
 	if err != nil {
 		if err.Error() == models.UNCONFIRMED_USER {
 			models.WriteError(w, models.ErrUnconfirmedUser)
@@ -159,10 +139,6 @@ func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		models.WriteError(w, models.ErrUnauthorizedAccess)
 		return
 	}
-	uidCookie := http.Cookie{Name: "UID", Value: user.ID.Hex(), Expires: models.COOKIE_TTL(), Path: "/api"}
-	http.SetCookie(w, &uidCookie)
-	authCookie := http.Cookie{Name: "AUTH-TOKEN", Value: token, Expires: models.COOKIE_TTL(), Path: "/api"}
-	http.SetCookie(w, &authCookie)
 	user.ScrubSensitiveInfo()
 	json.NewEncoder(w).Encode(user)
 }

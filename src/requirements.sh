@@ -24,3 +24,6 @@ go get github.com/dgrijalva/jwt-go
 
 echo gettiing smtp tools
 go get gopkg.in/gomail.v2
+
+echo cors shit
+go get github.com/rs/cors
