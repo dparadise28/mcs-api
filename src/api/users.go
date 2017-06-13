@@ -4,7 +4,6 @@ import (
 	"db"
 	"encoding/json"
 	"github.com/julienschmidt/httprouter"
-	//"gopkg.in/go-playground/validator.v9"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"log"
@@ -36,13 +35,8 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 	updatedClaims := models.GenerateTokenClaims(user.Roles.Access, user.Confirmed)
 	updatedToken, _ := updatedClaims.CreateToken()
-	authCookie := http.Cookie{
-		Name:    models.JWT_COOKIE_NAME,
-		Path:    "/",
-		Value:   updatedToken,
-		Expires: models.COOKIE_TTL(),
-	}
-	http.SetCookie(w, &authCookie)
+	w.Header().Set(models.JWT_COOKIE_NAME, updatedToken)
+	w.Header().Set(models.USERID_COOKIE_NAME, user.ID.Hex())
 	user.ScrubSensitiveInfo()
 	log.Println(info)
 	json.NewEncoder(w).Encode(user)
@@ -119,15 +113,8 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	updatedClaims := models.GenerateTokenClaims(user.Roles.Access, user.Confirmed)
 	updatedToken, _ := updatedClaims.CreateToken()
-	authCookie := http.Cookie{
-		Name:    models.JWT_COOKIE_NAME,
-		Path:    "/",
-		Value:   updatedToken,
-		Expires: models.COOKIE_TTL(),
-	}
-	http.SetCookie(w, &authCookie)
-	uidCookie := http.Cookie{Name: models.USERID_COOKIE_NAME, Value: user.ID.Hex(), Expires: models.COOKIE_TTL(), Path: "/api"}
-	http.SetCookie(w, &uidCookie)
+	w.Header().Set(models.JWT_COOKIE_NAME, updatedToken)
+	w.Header().Set(models.USERID_COOKIE_NAME, user.ID.Hex())
 
 	user.Login.Token = updatedToken
 	user.Login.UID = user.ID
@@ -145,8 +132,8 @@ func UserInfo(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 func GetUserById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var user models.UserAPIResponse
-	uid, _ := r.Cookie(models.USERID_COOKIE_NAME)
-	user.GetByIdStr(db.Database, uid.Value)
+	uid := r.Header.Get(models.USERID_COOKIE_NAME)
+	user.GetByIdStr(db.Database, uid)
 	json.NewEncoder(w).Encode(user)
 }
 
@@ -162,20 +149,8 @@ func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		models.WriteError(w, models.ErrUnauthorizedAccess)
 		return
 	}
-	uidCookie := http.Cookie{
-		Name:    models.USERID_COOKIE_NAME,
-		Value:   user.ID.Hex(),
-		Expires: models.COOKIE_TTL(),
-		Path:    "/",
-	}
-	http.SetCookie(w, &uidCookie)
-	authCookie := http.Cookie{
-		Name:    models.JWT_COOKIE_NAME,
-		Value:   token,
-		Expires: models.COOKIE_TTL(),
-		Path:    "/",
-	}
-	http.SetCookie(w, &authCookie)
+	w.Header().Set(models.JWT_COOKIE_NAME, token)
+	w.Header().Set(models.USERID_COOKIE_NAME, user.ID.Hex())
 	user.ScrubSensitiveInfo()
 	user.Login.Token = token
 	user.Login.UID = user.ID
