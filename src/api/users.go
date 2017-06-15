@@ -55,9 +55,9 @@ func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId stri
 			},
 		},
 	}
-	uid, _ := r.Cookie("UID")
+	uid := r.Header.Get(models.USERID_COOKIE_NAME)
 	info, _ := c.Find(bson.M{
-		"_id": bson.ObjectIdHex(uid.Value),
+		"_id": bson.ObjectIdHex(uid),
 	}).Apply(change, &user)
 	user.UpdateTokenAndCookie(w)
 	user.ScrubSensitiveInfo()
@@ -79,33 +79,16 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	user.ID = bson.NewObjectId()
 	user.Confirmed = false
 	user.ConfirmationCode = tools.GenerateConfirmationCode()
-	userPassword := user.Password
-	user.Password = ""
+	user.Password = tools.HashPassword(user.Password)
 
 	// copy db session for the stores collection and close on completion
 	session := db.Database.Session.Copy()
+	defer session.Close()
 	c := db.Database.C(models.UserCollectionName).With(session)
 	if insert_err := c.Insert(&user); insert_err != nil {
 		models.WriteError(w, models.ErrResourceConflict)
 		return
 	}
-	go func() {
-		defer session.Close()
-		hashedPassword := tools.HashPassword(userPassword)
-		change := mgo.Change{
-			ReturnNew: false,
-			Upsert:    false,
-			Remove:    false,
-			Update: bson.M{
-				"$set": bson.M{
-					"password": hashedPassword,
-				},
-			},
-		}
-		if _, err := c.Find(bson.M{"_id": user.ID}).Apply(change, &user); err != nil {
-			log.Printf(err.Error())
-		}
-	}()
 
 	user.UpdateTokenAndCookie(w)
 	email := user.EmailConfirmation()

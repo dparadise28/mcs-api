@@ -5,14 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/julienschmidt/httprouter"
-	"gopkg.in/go-playground/validator.v9"
 	"gopkg.in/mgo.v2/bson"
 	"models"
 	"net/http"
 	"tools"
 )
-
-var validate *validator.Validate
 
 func StoreSearch(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	// TODO write queries and maybe split into different requests
@@ -32,6 +29,10 @@ func GetStoreById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 
 func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var store models.Store
+	store.DB = db.Database
+	store.DBSession = store.DB.Session.Copy()
+	defer store.DBSession.Close()
+
 	v := new(tools.DefaultValidator)
 	if err := json.NewDecoder(r.Body).Decode(&store); err != nil {
 		models.WriteError(w, models.ErrBadRequest)
@@ -41,8 +42,7 @@ func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		models.WriteError(w, &validationErr)
 		return
 	}
-
-	if insert_err := store.Insert(db.Database); insert_err != nil {
+	if insert_err := store.Insert(); insert_err != nil {
 		models.WriteError(w, models.ErrResourceConflict)
 		return
 	}

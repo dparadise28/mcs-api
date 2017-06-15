@@ -1,6 +1,9 @@
 package networking
 
 import (
+	//"github.com/didip/tollbooth"
+	//"github.com/didip/tollbooth/thirdparty/tollbooth_httprouter"
+	//"reflect"
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"models"
@@ -58,7 +61,7 @@ func generateAPIEndPoint(fn HandlerMethodType, fullEndPoint string) httprouter.H
 func ServeEndPoints() *httprouter.Router {
 	router := httprouter.New()
 	control_methods := map[string]ControlMethodType{
-		// Not much else is needed for now
+		// Not much else is needed for now (preflight options are automatic for all calls)
 		"GET":  router.GET,
 		"POST": router.POST,
 	}
@@ -72,7 +75,17 @@ func ServeEndPoints() *httprouter.Router {
 		))
 
 		log.Printf("GENERATING END POINT: ", ctrl_method, ": ", fullEndPoint)
-
+		/*var rps int64
+		if api_end_point["max_rps"] != nil {
+			rps = int64(api_end_point["max_rps"].(int))
+		} else {
+			rps = int64(MAX_RPS / len(reflect.ValueOf(APIRouteMap).MapKeys()))
+		}
+		limiter := tollbooth.NewLimiter(rps, time.Second)
+		control_methods[ctrl_method](
+			fullEndPoint,
+			tollbooth_httprouter.LimitHandler(generateAPIEndPoint(handler_method, fullEndPoint), limiter),
+		)*/
 		control_methods[ctrl_method](
 			fullEndPoint,
 			generateAPIEndPoint(handler_method, fullEndPoint),

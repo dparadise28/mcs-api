@@ -3,6 +3,9 @@ package models
 import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"log"
+	"reflect"
+	"strings"
 )
 
 var StoreCollectionName = "Stores"
@@ -64,22 +67,94 @@ type Store struct {
 	// search solution or building one
 	ShortDescription string `json:"short_description" validate:"max=50"`
 
-	// retain the list of platform and store
-	// instance categories for order and filtering
-	// needs
-	CategoryList       []string `json:"store_categories"`
-	PlatformCategories []string `json:"platform_categories"`
+	CategoryNames []string        `bson:"c_names" json:"category_names"`
+	CategoryIDs   []bson.ObjectId `bson:"c_ids" json:"category_ids"`
+	CTree         []StoreCategory `bson:"-" json:"category_tree" validate:"required"`
+
+	products []Product
+	//PlatformCategories []string        `json:"platform_categories"`
+
+	DB        *mgo.Database
+	DBSession *mgo.Session
 }
 
-func (s *Store) Insert(db *mgo.Database) error {
-	// copy db session for the stores collection and close on completion
-	session := db.Session.Copy()
-	defer session.Close()
-
-	// grab the proper collection, create a new store id and attempt an insert
-	c := db.C(StoreCollectionName).With(session)
+func (s *Store) PrepStoreEntitiesForInsert() {
 	s.ID = bson.NewObjectId()
+	s.CategoryNames = []string{}
+	for category_index, _ := range s.CTree {
+		c_id := bson.NewObjectId()
+		s.CTree[category_index].ID = c_id
+		s.CTree[category_index].StoreId = s.ID
+
+		s.CategoryIDs = append(s.CategoryIDs, c_id)
+		s.CategoryNames = append(s.CategoryNames, s.CTree[category_index].Name)
+		for product_index, _ := range s.CTree[category_index].Products {
+			p_id := bson.NewObjectId()
+			s.CTree[category_index].Products[product_index].ID = p_id
+			s.CTree[category_index].Products[product_index].StoreID = s.ID
+			s.CTree[category_index].Products[product_index].CategoryID = c_id
+
+			s.CTree[category_index].ProductIDS = append(s.CTree[category_index].ProductIDS, p_id)
+			s.products = append(s.products, s.CTree[category_index].Products[product_index])
+		}
+	}
+}
+
+func I(array interface{}) []interface{} {
+	v := reflect.ValueOf(array)
+	t := v.Type()
+
+	if t.Kind() != reflect.Slice {
+		log.Panicf("`array` should be %s but got %s", reflect.Slice, t.Kind())
+	}
+
+	result := make([]interface{}, v.Len(), v.Len())
+
+	for i := 0; i < v.Len(); i++ {
+		result[i] = v.Index(i).Interface()
+	}
+
+	return result
+}
+
+func (s *Store) Insert() error {
+	c := s.DB.C(StoreCollectionName).With(s.DBSession)
+	s.PrepStoreEntitiesForInsert()
 	s.Address.Location.Type = "Point"
-	insert_err := c.Insert(&s)
-	return insert_err
+	if insert_err := c.Insert(&s); insert_err != nil {
+		// dont move on if store record is faulty
+		if strings.Count(insert_err.Error(), "ObjectId") == 1 {
+			log.Println("during store")
+			log.Println(insert_err)
+			return nil
+		}
+		return insert_err
+	}
+	return s.InsertStoreCategories()
+}
+
+func (s *Store) InsertStoreCategories() error {
+	c := s.DB.C(CategoryCollectionName).With(s.DBSession)
+	if insert_err := c.Insert(I(s.CTree)...); insert_err != nil {
+		if strings.Count(insert_err.Error(), "ObjectId") == 1 {
+			log.Println("during categories")
+			log.Println(insert_err)
+			return nil
+		}
+		return insert_err
+	}
+	return s.InsertStoreProducts()
+}
+
+func (s *Store) InsertStoreProducts() error {
+	c := s.DB.C(ProductCollectionName).With(s.DBSession)
+	if insert_err := c.Insert(I(s.products)...); insert_err != nil {
+		if strings.Count(insert_err.Error(), "ObjectId") == 1 {
+			log.Println("during products")
+			log.Println(insert_err)
+			return nil
+		}
+		return insert_err
+	}
+	return s.InsertStoreProducts()
 }
