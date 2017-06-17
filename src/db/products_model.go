@@ -8,9 +8,8 @@ import (
 var ProductIndex = []mgo.Index{
 	mgo.Index{
 		Key: []string{
-			"category_id",
 			"store_id",
-			"title",
+			"category_id",
 		},
 		Unique:     false,
 		DropDups:   true,

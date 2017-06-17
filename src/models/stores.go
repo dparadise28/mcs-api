@@ -8,7 +8,9 @@ import (
 	"strings"
 )
 
-var StoreCollectionName = "Stores"
+const StoreCollectionName = "Stores"
+
+var MAX_DISTANCE = 1609.34 * 2 // max distance is static for now (2 mi)
 
 type OpenHours struct {
 	Hours  Hours `json:"hours"`
@@ -55,27 +57,25 @@ type Store struct {
 	Phone           string             `json:"phone"`
 	Pickup          StorePickup        `json:"pickup"`
 	Address         Address            `json:"address"`
-	TaxRate         float64            `json:"tax_rate" validate:"required"`
+	TaxRate         float64            `bson:"tax_rate" json:"tax_rate" validate:"required"`
 	Delivery        StoreDelivery      `json:"delivery"`
 	Distance        float64            `bson:"distance,omitempty" json:"distance,omitempty"`
-	WorkingHours    WeeklyWorkingHours `json:"working_hours"`
-	LongDescription string             `json:"long_description"`
+	WorkingHours    WeeklyWorkingHours `bson:"working_hours" json:"working_hours"`
+	LongDescription string             `bson:"long_desc" json:"long_description"`
 	// this field has has a fulltext index for
 	// full text search so must so we must
 	// ensure its length for now to avoid index
 	// bloating untill switching to a more robust
 	// search solution or building one
-	ShortDescription string `json:"short_description" validate:"max=50"`
+	ShortDescription string `bson:"short_desc" json:"short_description" validate:"max=50"`
 
 	CategoryNames []string        `bson:"c_names" json:"category_names"`
-	CategoryIDs   []bson.ObjectId `bson:"c_ids" json:"category_ids"`
 	CTree         []StoreCategory `bson:"-" json:"category_tree" validate:"required"`
 
-	products []Product
-	//PlatformCategories []string        `json:"platform_categories"`
+	products []Product `bson:"-" json:"-"`
 
-	DB        *mgo.Database
-	DBSession *mgo.Session
+	DB        *mgo.Database `bson:"-" json:"-"`
+	DBSession *mgo.Session  `bson:"-" json:"-"`
 }
 
 func (s *Store) PrepStoreEntitiesForInsert() {
@@ -83,18 +83,20 @@ func (s *Store) PrepStoreEntitiesForInsert() {
 	s.CategoryNames = []string{}
 	for category_index, _ := range s.CTree {
 		c_id := bson.NewObjectId()
+
 		s.CTree[category_index].ID = c_id
 		s.CTree[category_index].StoreId = s.ID
+		s.CTree[category_index].SortOrder = uint16(category_index)
 
-		s.CategoryIDs = append(s.CategoryIDs, c_id)
 		s.CategoryNames = append(s.CategoryNames, s.CTree[category_index].Name)
 		for product_index, _ := range s.CTree[category_index].Products {
 			p_id := bson.NewObjectId()
+
 			s.CTree[category_index].Products[product_index].ID = p_id
 			s.CTree[category_index].Products[product_index].StoreID = s.ID
 			s.CTree[category_index].Products[product_index].CategoryID = c_id
+			s.CTree[category_index].Products[product_index].SortOrder = uint16(product_index)
 
-			s.CTree[category_index].ProductIDS = append(s.CTree[category_index].ProductIDS, p_id)
 			s.products = append(s.products, s.CTree[category_index].Products[product_index])
 		}
 	}
@@ -157,4 +159,87 @@ func (s *Store) InsertStoreProducts() error {
 		return insert_err
 	}
 	return s.InsertStoreProducts()
+}
+
+func (s *Store) RetrieveFullStoreByID(id string) (error, bson.M) {
+	pipeline := []bson.M{
+		bson.M{
+			"$match": bson.M{
+				"_id": bson.ObjectIdHex(id),
+			},
+		},
+		bson.M{
+			"$lookup": bson.M{
+				"from":         CategoryCollectionName,
+				"localField":   "_id",
+				"foreignField": "store_id",
+				"as":           "categories",
+			},
+		},
+		bson.M{
+			"$unwind": bson.M{
+				"path": "$categories",
+				"preserveNullAndEmptyArrays": true,
+			},
+		},
+		bson.M{
+			"$sort": bson.M{
+				"categories.sort_order": 1,
+			},
+		},
+		bson.M{
+			"$lookup": bson.M{
+				"from":         ProductCollectionName,
+				"localField":   "categories._id",
+				"foreignField": "category_id",
+				"as":           "categories.products",
+			},
+		},
+		bson.M{
+			"$group": bson.M{
+				"_id":               "$_id",
+				"categories":        bson.M{"$push": "$categories"},
+				"working_hours":     bson.M{"$first": "$working_hours"},
+				"image":             bson.M{"$first": "$image"},
+				"delivery":          bson.M{"$first": "$delivery"},
+				"phone":             bson.M{"$first": "$phone"},
+				"tax_rate":          bson.M{"$first": "$tax_rate"},
+				"address":           bson.M{"$first": "$address"},
+				"long_description":  bson.M{"$first": "$long_desc"},
+				"distance":          bson.M{"$first": "$distance"},
+				"name":              bson.M{"$first": "$name"},
+				"pickup":            bson.M{"$first": "$pickup"},
+				"short_description": bson.M{"$first": "$short_desc"},
+			},
+		},
+		bson.M{
+			"$sort": bson.M{
+				"categories.sort_order":          1,
+				"categories.products.sort_order": 1,
+			},
+		},
+	}
+	c := s.DB.C(StoreCollectionName).With(s.DBSession)
+	pipe := c.Pipe(pipeline)
+	resp := []bson.M{}
+	err := pipe.All(&resp)
+	return err, resp[0]
+}
+
+func (s *Store) FindStoresByLocation(long float64, lat float64, maxDist float64, time int) (error, []bson.M) {
+	query := bson.M{
+		"address.location": bson.M{
+			"$near": bson.M{
+				"$geometry": bson.M{
+					"type":        "Point",
+					"coordinates": []float64{long, lat},
+				},
+				"$maxDistance": maxDist,
+			},
+		},
+	}
+	c := s.DB.C(StoreCollectionName).With(s.DBSession)
+	stores := []bson.M{}
+	err := c.Find(query).All(&stores)
+	return err, stores
 }

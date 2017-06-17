@@ -18,15 +18,15 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	defer session.Close()
 
 	c := db.Database.C(models.UserCollectionName).With(session)
+	query := bson.M{"$set": bson.M{"confirmed": true, "confirmation_code": ""}}
+	if r.URL.Query().Get("password") != "" {
+		query = bson.M{"$set": bson.M{"confirmed": true, "confirmation_code": "", "password": tools.HashPassword(r.URL.Query().Get("password"))}}
+	}
 	change := mgo.Change{
 		ReturnNew: true,
 		Upsert:    false,
 		Remove:    false,
-		Update: bson.M{
-			"$set": bson.M{
-				"confirmed": true, "confirmation_code": "",
-			},
-		},
+		Update:    query,
 	}
 	info, _ := c.Find(bson.M{
 		"_id":               bson.ObjectIdHex(ps.ByName("user_id")),
@@ -49,11 +49,7 @@ func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId stri
 		ReturnNew: true,
 		Upsert:    false,
 		Remove:    false,
-		Update: bson.M{
-			"$set": bson.M{
-				"user_roles.access." + storeId: models.ACCESSROLE_STOREOWNER,
-			},
-		},
+		Update:    bson.M{"$set": bson.M{"user_roles.access." + storeId: models.ACCESSROLE_STOREOWNER}},
 	}
 	uid := r.Header.Get(models.USERID_COOKIE_NAME)
 	info, _ := c.Find(bson.M{
@@ -62,6 +58,29 @@ func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId stri
 	user.UpdateTokenAndCookie(w)
 	user.ScrubSensitiveInfo()
 	log.Println(info)
+}
+
+func UserResendConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var user models.User
+	session := db.Database.Session.Copy()
+	defer session.Close()
+
+	c := db.Database.C(models.UserCollectionName).With(session)
+	change := mgo.Change{
+		ReturnNew: true,
+		Upsert:    false,
+		Remove:    false,
+		Update:    bson.M{"$set": bson.M{"confirmation_code": tools.GenerateConfirmationCode()}},
+	}
+	info, _ := c.Find(bson.M{"email": r.URL.Query().Get("email")}).Apply(change, &user)
+
+	user.UpdateTokenAndCookie(w)
+	user.Password = ""
+	log.Println(info)
+	email := user.EmailConfirmation()
+	tools.EmailQueue <- &email
+	user.ConfirmationCode = ""
+	json.NewEncoder(w).Encode(user)
 }
 
 func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

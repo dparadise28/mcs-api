@@ -3,28 +3,41 @@ package api
 import (
 	"db"
 	"encoding/json"
-	"fmt"
 	"github.com/julienschmidt/httprouter"
-	"gopkg.in/mgo.v2/bson"
+	"strconv"
+	//"gopkg.in/mgo.v2/bson"
 	"models"
 	"net/http"
 	"tools"
 )
 
 func StoreSearch(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	// TODO write queries and maybe split into different requests
-	// search by location, search by category etc
-	fmt.Println(ps.ByName("store_id"))
+	var store models.Store
+	store.DB = db.Database
+	store.DBSession = store.DB.Session.Copy()
+	defer store.DBSession.Close()
+
+	lon := r.URL.Query().Get("lon")
+	lat := r.URL.Query().Get("lat")
+	time := r.URL.Query().Get("time")
+	if lon == "" || lat == "" || time == "" {
+		models.WriteError(w, models.ErrBadRequest)
+	}
+	lon_float, _ := strconv.ParseFloat(lon, 1000000)
+	lat_float, _ := strconv.ParseFloat(lat, 1000000)
+	time_int, _ := strconv.Atoi(time)
+	_, resp := store.FindStoresByLocation(lon_float, lat_float, models.MAX_DISTANCE, time_int)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func GetStoreById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var store models.Store
-	session := db.Database.Session.Copy()
-	defer session.Close()
+	store.DB = db.Database
+	store.DBSession = store.DB.Session.Copy()
+	defer store.DBSession.Close()
 
-	c := db.Database.C(models.StoreCollectionName).With(session)
-	c.Find(bson.M{"_id": bson.ObjectIdHex(ps.ByName("store_id"))}).One(&store)
-	json.NewEncoder(w).Encode(store)
+	_, resp := store.RetrieveFullStoreByID(ps.ByName("store_id"))
+	json.NewEncoder(w).Encode(resp)
 }
 
 func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
