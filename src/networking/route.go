@@ -28,6 +28,7 @@ var Handles = map[string]interface{}{
 	"/store/search":                                   api.StoreSearch,
 	"/store/info/:store_id":                           api.GetStoreById,
 	"/store/retrieve/full/:store_id":                  api.GetStoreById,
+	"/cart/update/product/quantity":                   api.UpdateCartProductQuantity,
 	//"/store/categories/create":                        api.StoreCategories,
 	"/transform": tools.RemodelJ,
 }
@@ -35,7 +36,6 @@ var Handles = map[string]interface{}{
 var APIRouteMap = map[string]map[string]interface{}{
 	"/h2":   {"control_method": "GET", "authenticate": []string{}, "max_rps": 100},
 	"/docs": {"control_method": "GET", "authenticate": []string{}, "max_rps": 100},
-	//"/categories": {"control_method": "GET"},
 
 	// products api
 	/*"/store/categories/create": {
@@ -44,6 +44,14 @@ var APIRouteMap = map[string]map[string]interface{}{
 		"authenticate":   []string{},
 		"max_rps":        nil,
 	},*/
+
+	// cart
+	"/cart/update/product/quantity": {
+		"control_method": "POST",
+		"post_payload":   models.CartRequest{},
+		"authenticate":   []string{},
+		"max_rps":        nil,
+	},
 
 	// users api
 	"/user/create": {

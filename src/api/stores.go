@@ -4,6 +4,7 @@ import (
 	"db"
 	"encoding/json"
 	"github.com/julienschmidt/httprouter"
+	"log"
 	"strconv"
 	//"gopkg.in/mgo.v2/bson"
 	"models"
@@ -48,6 +49,7 @@ func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	v := new(tools.DefaultValidator)
 	if err := json.NewDecoder(r.Body).Decode(&store); err != nil {
+		log.Println(err)
 		models.WriteError(w, models.ErrBadRequest)
 		return
 	}

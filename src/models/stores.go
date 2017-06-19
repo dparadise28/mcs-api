@@ -4,7 +4,6 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"log"
-	"reflect"
 	"strings"
 )
 
@@ -32,7 +31,7 @@ type StoreDelivery struct {
 	// fee model at some point but this will do
 	// for now. That can be split out form the base
 	// store model
-	Fee       uint   `bson:"fee,omitempty" json:"delivery_fee"`
+	Fee       uint32 `bson:"fee,omitempty" json:"delivery_fee"`
 	Offered   bool   `bson:"offered" json:"service_offered" validate:"required"`
 	MaxDist   int    `bson:"max_distance,omitempty" json:"delivery_distance"`
 	MinTime   uint8  `bson:"min_time,omitempty" json:"maximum_time_to_delivery"`
@@ -54,14 +53,14 @@ type Store struct {
 	ID              bson.ObjectId      `bson:"_id,omitempty" json:"store_id"`
 	Name            string             `bson:"name" json:"name"`
 	Image           string             `json:"image"`
-	Phone           string             `json:"phone"`
+	Phone           uint64             `json:"phone" validate:"required"`
 	Pickup          StorePickup        `json:"pickup"`
 	Address         Address            `json:"address"`
 	TaxRate         float64            `bson:"tax_rate" json:"tax_rate" validate:"required"`
 	Delivery        StoreDelivery      `json:"delivery"`
 	Distance        float64            `bson:"distance,omitempty" json:"distance,omitempty"`
-	WorkingHours    WeeklyWorkingHours `bson:"working_hours" json:"working_hours"`
-	LongDescription string             `bson:"long_desc" json:"long_description"`
+	WorkingHours    WeeklyWorkingHours `bson:"working_hours" json:"working_hours" validate:"required"`
+	LongDescription string             `bson:"long_desc" json:"long_description" validate:"max=200"`
 	// this field has has a fulltext index for
 	// full text search so must so we must
 	// ensure its length for now to avoid index
@@ -70,7 +69,7 @@ type Store struct {
 	ShortDescription string `bson:"short_desc" json:"short_description" validate:"max=50"`
 
 	CategoryNames []string        `bson:"c_names" json:"category_names"`
-	CTree         []StoreCategory `bson:"-" json:"category_tree" validate:"required"`
+	CTree         []StoreCategory `bson:"-" json:"categories" validate:"required"`
 
 	products []Product `bson:"-" json:"-"`
 
@@ -102,27 +101,11 @@ func (s *Store) PrepStoreEntitiesForInsert() {
 	}
 }
 
-func I(array interface{}) []interface{} {
-	v := reflect.ValueOf(array)
-	t := v.Type()
-
-	if t.Kind() != reflect.Slice {
-		log.Panicf("`array` should be %s but got %s", reflect.Slice, t.Kind())
-	}
-
-	result := make([]interface{}, v.Len(), v.Len())
-
-	for i := 0; i < v.Len(); i++ {
-		result[i] = v.Index(i).Interface()
-	}
-
-	return result
-}
-
 func (s *Store) Insert() error {
 	c := s.DB.C(StoreCollectionName).With(s.DBSession)
 	s.PrepStoreEntitiesForInsert()
 	s.Address.Location.Type = "Point"
+	s.Address.Location.Coordinates = []float64{s.Address.Longitude, s.Address.Latitude}
 	if insert_err := c.Insert(&s); insert_err != nil {
 		// dont move on if store record is faulty
 		if strings.Count(insert_err.Error(), "ObjectId") == 1 {

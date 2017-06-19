@@ -5,12 +5,20 @@ import (
 	"models"
 )
 
-var CategoryIndex = []mgo.Index{
-	// for mgo index struct type
-	// http://bazaar.launchpad.net/+branch/mgo/v2/view/head:/session.go#L889
+var CartIndex = []mgo.Index{
 	mgo.Index{
 		Key: []string{
-			"name",
+			"user_id",
+			"store_id",
+			"active",
+		},
+		Unique:     true,
+		DropDups:   true,
+		Background: true,
+		Sparse:     true,
+	},
+	mgo.Index{
+		Key: []string{
 			"store_id",
 		},
 		Unique:     false,
@@ -20,12 +28,12 @@ var CategoryIndex = []mgo.Index{
 	},
 }
 
-func EnsureCategoryIndex() {
+func EnsureCartIndex() {
 	session := Database.Session.Copy()
 	defer session.Close()
+	c := Database.C(models.CartCollectionName).With(session)
 
-	c := Database.C(models.CategoryCollectionName).With(session)
-	for _, index := range CategoryIndex {
+	for _, index := range CartIndex {
 		err := c.EnsureIndex(index)
 		if err != nil {
 			panic(err)

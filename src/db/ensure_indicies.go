@@ -5,4 +5,5 @@ func InitIndicies() {
 	EnsureCategoryIndex()
 	EnsureProductIndex()
 	EnsureUserIndex()
+	EnsureCartIndex()
 }
