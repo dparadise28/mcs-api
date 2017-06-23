@@ -13,6 +13,7 @@ type Product struct {
 	ProductTitle   string        `bson:"title" json:"title" validate:"required"`
 	DisplayPrice   string        `bson:"-" json:"display_price"`
 	PriceCents     uint32        `bson:"price_cents" json:"price_cents" validate:"required"`
+	Enabled        bool          `bson:"enabled" json:"enabled"`
 	ProductRatings struct {
 		ReviewCount           uint64  `bson:"review_count" json:"total_reviews"`
 		ReviewPercentageScore float64 `bson:"pct_score" json:"review_percent"`

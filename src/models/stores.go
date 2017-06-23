@@ -85,6 +85,7 @@ func (s *Store) PrepStoreEntitiesForInsert() {
 
 		s.CTree[category_index].ID = c_id
 		s.CTree[category_index].StoreId = s.ID
+		s.CTree[category_index].Enabled = true
 		s.CTree[category_index].SortOrder = uint16(category_index)
 
 		s.CategoryNames = append(s.CategoryNames, s.CTree[category_index].Name)
@@ -142,6 +143,15 @@ func (s *Store) InsertStoreProducts() error {
 		return insert_err
 	}
 	return s.InsertStoreProducts()
+}
+
+func (s *Store) RetrieveStoreByID(id string) error {
+	query := bson.M{
+		"_id": bson.ObjectIdHex(id),
+	}
+	c := s.DB.C(StoreCollectionName).With(s.DBSession)
+	err := c.Find(query).One(s)
+	return err
 }
 
 func (s *Store) RetrieveFullStoreByID(id string) (error, bson.M) {
