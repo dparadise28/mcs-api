@@ -3,7 +3,6 @@ package models
 import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"strings"
 )
 
 var UserCollectionName = "Users"

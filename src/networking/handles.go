@@ -23,5 +23,12 @@ func Info(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 }
 
 func Docs(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	json.NewEncoder(w).Encode(APIRouteMap)
+	routeDoc := make([]map[string]map[string]interface{}, len(APIRouteList))
+	for index, route := range APIRouteList {
+		for routeEndPoint, routeSpecs := range route {
+			routeSpecs["api_method"] = ""
+			routeDoc[index] = map[string]map[string]interface{}{routeEndPoint: routeSpecs}
+		}
+	}
+	json.NewEncoder(w).Encode(routeDoc)
 }

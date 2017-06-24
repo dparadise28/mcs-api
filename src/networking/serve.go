@@ -32,10 +32,12 @@ func generateAPIEndPoint(fn HandlerMethodType, fullEndPoint string) httprouter.H
 			}
 		}()
 
-		SetBaseHeaders(respWrtr, req) // found in network/security
+		// found in network/security
+		SetBaseHeaders(respWrtr, req)
 		if req.Method == "OPTIONS" {
 			return
 		}
+
 		// A post should contain a request body
 		if req.Method == "POST" && req.Body == nil {
 			reqEndTime := time.Now()
@@ -68,7 +70,7 @@ func ServeEndPoints() *httprouter.Router {
 	for end_point, api_end_point := range APIRouteMap {
 		ctrl_method := api_end_point["control_method"].(string)
 		fullEndPoint := "/api" + end_point
-		handler_method := Handles[end_point].(func(
+		handler_method := APIRouteMap[end_point]["api_method"].(func(
 			http.ResponseWriter,
 			*http.Request,
 			httprouter.Params,
