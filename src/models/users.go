@@ -3,6 +3,7 @@ package models
 import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"strings"
 )
 
 var UserCollectionName = "Users"
@@ -43,7 +44,8 @@ func (u *User) EmailConfirmation() Email {
 	emailSubject := "Thank You for signing up!"
 	emailBody := "Welcome! Please click on the following link to confirm your account \n" +
 		"http://mycorner.store:8001/api/user/confirm/email/" + u.ID.Hex() + "/" + u.ConfirmationCode +
-		"\n\n\tconfirmation code: " + u.ConfirmationCode
+		"\n\n\tUser Id: " + u.ID.Hex() +
+		"\n\tconfirmation code: " + u.ConfirmationCode
 	return Email{u.Email, emailBody, emailSubject}
 }
 

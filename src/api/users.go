@@ -9,6 +9,7 @@ import (
 	"log"
 	"models"
 	"net/http"
+	"strings"
 	"tools"
 )
 
@@ -72,7 +73,7 @@ func UserResendConfirmation(w http.ResponseWriter, r *http.Request, ps httproute
 		Remove:    false,
 		Update:    bson.M{"$set": bson.M{"confirmation_code": tools.GenerateConfirmationCode()}},
 	}
-	info, _ := c.Find(bson.M{"email": r.URL.Query().Get("email")}).Apply(change, &user)
+	info, _ := c.Find(bson.M{"email": strings.ToLower(r.URL.Query().Get("email"))}).Apply(change, &user)
 
 	user.UpdateTokenAndCookie(w)
 	user.Password = ""
@@ -111,14 +112,14 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	user.UpdateTokenAndCookie(w)
 	email := user.EmailConfirmation()
-	tools.EmailQueue <- &email
 	user.ScrubSensitiveInfo()
+	tools.EmailQueue <- &email
 	json.NewEncoder(w).Encode(user)
 }
 
 func UserInfo(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var user models.UserAPIResponse
-	user.GetByEmail(db.Database, ps.ByName("email"))
+	user.GetByEmail(db.Database, strings.ToLower(ps.ByName("email")))
 	json.NewEncoder(w).Encode(user)
 }
 
@@ -131,7 +132,7 @@ func GetUserById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var user models.User
-	user.GetByEmail(db.Database, r.URL.Query().Get("email"))
+	user.GetByEmail(db.Database, strings.ToLower(r.URL.Query().Get("email")))
 	_, err := user.GenetateLoginTokenAndSetHeaders(r.URL.Query().Get("password"), w)
 	if err != nil {
 		if err.Error() == models.UNCONFIRMED_USER {

@@ -37,8 +37,8 @@ func GetStoreById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 	store.DBSession = store.DB.Session.Copy()
 	defer store.DBSession.Close()
 
-	_, resp := store.RetrieveStoreByID(ps.ByName("store_id"))
-	json.NewEncoder(w).Encode(resp)
+	store.RetrieveStoreByID(ps.ByName("store_id"))
+	json.NewEncoder(w).Encode(store)
 }
 
 func GetFullStoreById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
