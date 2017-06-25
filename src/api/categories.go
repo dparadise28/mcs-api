@@ -62,7 +62,6 @@ func UpdateStoreCategory(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		return
 	}
 
-	category.Enabled = true
 	category.DB = db.Database
 	category.DBSession = category.DB.Session.Copy()
 	defer category.DBSession.Close()
@@ -78,12 +77,38 @@ func EnableStoreCategory(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		models.WriteError(w, models.ErrBadRequest)
 		return
 	}
+	// set temporary name locally to stop validator from shitting itself
+	category.Name = "temp"
 	if validationErr := v.ValidateIncomingJsonRequest(&category); validationErr.Status != 200 {
 		models.WriteError(w, &validationErr)
 		return
 	}
+	category.DB = db.Database
+	category.DBSession = category.DB.Session.Copy()
+	defer category.DBSession.Close()
 	if err := category.ActivateStoreCategory(); err != nil {
 		models.WriteError(w, models.ErrBadRequest)
 	}
 	json.NewEncoder(w).Encode(category)
+}
+
+func ReorderStoreCategories(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var order models.CategoryOrder
+
+	v := new(tools.DefaultValidator)
+	if err := json.NewDecoder(r.Body).Decode(&order); err != nil {
+		models.WriteError(w, models.ErrBadRequest)
+		return
+	}
+	if validationErr := v.ValidateIncomingJsonRequest(&order); validationErr.Status != 200 {
+		models.WriteError(w, &validationErr)
+		return
+	}
+	order.DB = db.Database
+	order.DBSession = order.DB.Session.Copy()
+	defer order.DBSession.Close()
+	if err := order.ReorderStoreCategories(); err != nil {
+		models.WriteError(w, models.ErrBadRequest)
+	}
+	json.NewEncoder(w).Encode(order)
 }

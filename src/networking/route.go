@@ -202,79 +202,6 @@ var APIRouteList = []map[string]map[string]interface{}{
 		},
 	},
 
-	// store categories
-	map[string]map[string]interface{}{
-		"/store/categories/:store_id": {
-			"control_method": "GET",
-			"authenticate":   []string{},
-			"max_rps":        nil,
-			"api_method":     api.GetCategoriesByStoreId,
-			"desctiption": []string{
-				"Returns the full set of hydrated store categories containing",
-				"products in the order set by a store. This will filter out",
-				"any disabled categories.",
-				"",
-				"To include all disabled store categories and or productsuse the query",
-				"params include_disabled_categories=true&include_disabled_products=true",
-				"respectively.",
-				"",
-				"If there is a product that belongs to a diabled category and",
-				"the include_disabled_categories is set to true then the product",
-				"not show up in the response. To find that product or all products",
-				"use the /store/products/:store_id call with the include_disabled_products",
-				"query param",
-			},
-		},
-	},
-	map[string]map[string]interface{}{
-		"/store/category/create/:store_id": {
-			"control_method": "POST",
-			"authenticate": []string{
-				models.ACCESSROLE_CONFIRMED_USER,
-				models.ACCESSROLE_STOREOWNER,
-			},
-			"post_payload": models.Category{},
-			"max_rps":      nil,
-			"api_method":   api.AddStoreCategory,
-			"description": []string{
-				"Creates a new category and appends it as the",
-				"last in the seq. It is automatically set to be",
-				"enabled and will show up for users.",
-			},
-		},
-	},
-	map[string]map[string]interface{}{
-		"/store/category/udpate/:store_id": {
-			"control_method": "POST",
-			"authenticate": []string{
-				models.ACCESSROLE_CONFIRMED_USER,
-				models.ACCESSROLE_STOREOWNER,
-			},
-			"post_payload": models.Category{},
-			"max_rps":      nil,
-			"api_method":   api.UpdateStoreCategory,
-			"desctiption": []string{
-				"This is an interface exposed to update the category name.",
-			},
-		},
-	},
-	map[string]map[string]interface{}{
-		"/store/category/activate/:store_id": {
-			"control_method": "POST",
-			"authenticate": []string{
-				models.ACCESSROLE_CONFIRMED_USER,
-				models.ACCESSROLE_STOREOWNER,
-			},
-			"post_payload": models.Category{},
-			"max_rps":      nil,
-			"api_method":   api.EnableStoreCategory,
-			"description": []string{
-				"Toggles the store category enabled field based on the value",
-				"it is set to in the request. This will affect user searches.",
-			},
-		},
-	},
-
 	// stores api
 	map[string]map[string]interface{}{
 		"/store/create": {
@@ -346,6 +273,121 @@ var APIRouteList = []map[string]map[string]interface{}{
 			"description": []string{
 				"Use this endpoint to retrieve a store with all of its",
 				"enabled and disabled categories/products.",
+			},
+		},
+	},
+
+	// store categories
+	map[string]map[string]interface{}{
+		"/store/categories/retrieve/:store_id": {
+			"control_method": "GET",
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.GetCategoriesByStoreId,
+			"desctiption": []string{
+				"Returns the full set of hydrated store categories containing",
+				"products in the order set by a store. This will filter out",
+				"any disabled categories.",
+				"",
+				"To include all disabled store categories and or productsuse the query",
+				"params include_disabled_categories=true&include_disabled_products=true",
+				"respectively.",
+				"",
+				"If there is a product that belongs to a diabled category and",
+				"the include_disabled_categories is set to true then the product",
+				"not show up in the response. To find that product or all products",
+				"use the /store/products/:store_id call with the include_disabled_products",
+				"query param",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/store/category/create/:store_id": {
+			"control_method": "POST",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+				models.ACCESSROLE_STOREOWNER,
+			},
+			"post_payload": models.Category{},
+			"max_rps":      nil,
+			"api_method":   api.AddStoreCategory,
+			"description": []string{
+				"Creates a new category and appends it as the",
+				"last in the seq. It is automatically set to be",
+				"enabled and will show up for users.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/store/category/update/:store_id": {
+			"control_method": "POST",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+				models.ACCESSROLE_STOREOWNER,
+			},
+			"post_payload": models.Category{},
+			"max_rps":      nil,
+			"api_method":   api.UpdateStoreCategory,
+			"desctiption": []string{
+				"This is an interface exposed to update the category name.",
+				"",
+				"required fields in post payload:",
+				"	store_id, category_id, name",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/store/category/activate/:store_id": {
+			"control_method": "POST",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+				models.ACCESSROLE_STOREOWNER,
+			},
+			"post_payload": models.Category{},
+			"max_rps":      nil,
+			"api_method":   api.EnableStoreCategory,
+			"description": []string{
+				"Toggles the store category enabled field based on the value",
+				"it is set to in the request. This will affect user searches.",
+				"",
+				"This api is not fully fleshed out yet. I say this because",
+				"reinstating a category means bringing it back in the full set",
+				"of results. To do this means reordering the full set of store",
+				"categories, or, simply assigning newly disbaled categories a",
+				"sort index equal to the cap set on categories (which has not",
+				"been introduced yet) and have the store reorder the categories",
+				"through the ui with the exposed api method (if they choose to",
+				"do so). I think the later is a better approach in terms of",
+				"complexity and product design but its something to talk through",
+				"since it is inherently a product design and affects user",
+				"user interactions and ui/ux flow. If the former is chosen and",
+				"reinstating a category in a specific position is desired then",
+				"a sort index will be required along with the fields listed below.",
+				"In either case more work will need to be done in order to update",
+				"the api to the desired specs. The extent of the work depends on",
+				"the path chosen.",
+				"",
+				"required fields in post payload:",
+				"	store_id, category_id, enabled",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/store/categories/reorder/:store_id": {
+			"control_method": "POST",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+				models.ACCESSROLE_STOREOWNER,
+			},
+			"post_payload": models.CategoryOrder{},
+			"max_rps":      nil,
+			"api_method":   api.ReorderStoreCategories,
+			"description": []string{
+				"Toggles the store category enabled field based on the value",
+				"it is set to in the request. This will affect user searches.",
+				"",
+				"required fields in post payload:",
+				"	store_id, category_id, enabled",
 			},
 		},
 	},
