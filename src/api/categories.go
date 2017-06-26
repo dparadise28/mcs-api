@@ -43,6 +43,9 @@ func AddStoreCategory(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		models.WriteError(w, &validationErr)
 		return
 	}
+	category.DB = db.Database
+	category.DBSession = category.DB.Session.Copy()
+	defer category.DBSession.Close()
 	if err := category.AddStoreCategory(); err != nil {
 		models.WriteError(w, models.ErrBadRequest)
 	}
@@ -61,7 +64,6 @@ func UpdateStoreCategory(w http.ResponseWriter, r *http.Request, ps httprouter.P
 		models.WriteError(w, &validationErr)
 		return
 	}
-
 	category.DB = db.Database
 	category.DBSession = category.DB.Session.Copy()
 	defer category.DBSession.Close()

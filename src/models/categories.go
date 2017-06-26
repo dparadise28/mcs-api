@@ -176,7 +176,7 @@ func (cat *Category) ActivateStoreCategory() error {
 		"_id":      cat.ID,
 		"store_id": cat.StoreId,
 	}).Apply(change, cat)
-	log.Println(cat)
+	//log.Println(cat)
 	log.Println(info)
 	return err
 }
