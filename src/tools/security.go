@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	DeafultPWHashCost      = 14
+	DeafultPWHashCost      = 8
 	ConfirmationCodeLength = 32
 )
 

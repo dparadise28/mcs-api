@@ -30,7 +30,8 @@ func SetBaseHeaders(respWrtr http.ResponseWriter, req *http.Request) {
 
 func ValidatedToken(w http.ResponseWriter, r *http.Request, ps hr.Params, ep string) (bool, *models.Error) {
 	tokenStr := r.Header.Get(models.JWT_COOKIE_NAME)
-	if tokenStr == "" {
+	uid := r.Header.Get(models.USERID_COOKIE_NAME)
+	if tokenStr == "" || uid == "" {
 		log.Println("Missing Token")
 		return false, models.ErrUnauthorizedAccess
 	}

@@ -9,6 +9,7 @@ import (
 	"log"
 	"models"
 	"net/http"
+	"strings"
 	"tools"
 )
 
@@ -18,15 +19,15 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	defer session.Close()
 
 	c := db.Database.C(models.UserCollectionName).With(session)
+	query := bson.M{"$set": bson.M{"confirmed": true, "confirmation_code": ""}}
+	if r.URL.Query().Get("password") != "" {
+		query = bson.M{"$set": bson.M{"confirmed": true, "confirmation_code": "", "password": tools.HashPassword(r.URL.Query().Get("password"))}}
+	}
 	change := mgo.Change{
 		ReturnNew: true,
 		Upsert:    false,
 		Remove:    false,
-		Update: bson.M{
-			"$set": bson.M{
-				"confirmed": true, "confirmation_code": "",
-			},
-		},
+		Update:    query,
 	}
 	info, _ := c.Find(bson.M{
 		"_id":               bson.ObjectIdHex(ps.ByName("user_id")),
@@ -49,19 +50,38 @@ func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId stri
 		ReturnNew: true,
 		Upsert:    false,
 		Remove:    false,
-		Update: bson.M{
-			"$set": bson.M{
-				"user_roles.access." + storeId: models.ACCESSROLE_STOREOWNER,
-			},
-		},
+		Update:    bson.M{"$set": bson.M{"user_roles.access." + storeId: models.ACCESSROLE_STOREOWNER}},
 	}
-	uid, _ := r.Cookie("UID")
+	uid := r.Header.Get(models.USERID_COOKIE_NAME)
 	info, _ := c.Find(bson.M{
-		"_id": bson.ObjectIdHex(uid.Value),
+		"_id": bson.ObjectIdHex(uid),
 	}).Apply(change, &user)
 	user.UpdateTokenAndCookie(w)
 	user.ScrubSensitiveInfo()
 	log.Println(info)
+}
+
+func UserResendConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var user models.User
+	session := db.Database.Session.Copy()
+	defer session.Close()
+
+	c := db.Database.C(models.UserCollectionName).With(session)
+	change := mgo.Change{
+		ReturnNew: true,
+		Upsert:    false,
+		Remove:    false,
+		Update:    bson.M{"$set": bson.M{"confirmation_code": tools.GenerateConfirmationCode()}},
+	}
+	info, _ := c.Find(bson.M{"email": strings.ToLower(r.URL.Query().Get("email"))}).Apply(change, &user)
+
+	user.UpdateTokenAndCookie(w)
+	user.Password = ""
+	log.Println(info)
+	email := user.EmailConfirmation()
+	tools.EmailQueue <- &email
+	user.ConfirmationCode = ""
+	json.NewEncoder(w).Encode(user)
 }
 
 func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -79,44 +99,27 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	user.ID = bson.NewObjectId()
 	user.Confirmed = false
 	user.ConfirmationCode = tools.GenerateConfirmationCode()
-	userPassword := user.Password
-	user.Password = ""
+	user.Password = tools.HashPassword(user.Password)
 
 	// copy db session for the stores collection and close on completion
 	session := db.Database.Session.Copy()
+	defer session.Close()
 	c := db.Database.C(models.UserCollectionName).With(session)
 	if insert_err := c.Insert(&user); insert_err != nil {
 		models.WriteError(w, models.ErrResourceConflict)
 		return
 	}
-	go func() {
-		defer session.Close()
-		hashedPassword := tools.HashPassword(userPassword)
-		change := mgo.Change{
-			ReturnNew: false,
-			Upsert:    false,
-			Remove:    false,
-			Update: bson.M{
-				"$set": bson.M{
-					"password": hashedPassword,
-				},
-			},
-		}
-		if _, err := c.Find(bson.M{"_id": user.ID}).Apply(change, &user); err != nil {
-			log.Printf(err.Error())
-		}
-	}()
 
 	user.UpdateTokenAndCookie(w)
 	email := user.EmailConfirmation()
-	tools.EmailQueue <- &email
 	user.ScrubSensitiveInfo()
+	tools.EmailQueue <- &email
 	json.NewEncoder(w).Encode(user)
 }
 
 func UserInfo(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var user models.UserAPIResponse
-	user.GetByEmail(db.Database, ps.ByName("email"))
+	user.GetByEmail(db.Database, strings.ToLower(ps.ByName("email")))
 	json.NewEncoder(w).Encode(user)
 }
 
@@ -129,7 +132,7 @@ func GetUserById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var user models.User
-	user.GetByEmail(db.Database, r.URL.Query().Get("email"))
+	user.GetByEmail(db.Database, strings.ToLower(r.URL.Query().Get("email")))
 	_, err := user.GenetateLoginTokenAndSetHeaders(r.URL.Query().Get("password"), w)
 	if err != nil {
 		if err.Error() == models.UNCONFIRMED_USER {
