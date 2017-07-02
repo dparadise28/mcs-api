@@ -401,9 +401,25 @@ var APIRouteList = []map[string]map[string]interface{}{
 		},
 	},
 
+	// platform assets
+	map[string]map[string]interface{}{
+		"/assets/image/search/:query_term": {
+			"control_method": "GET",
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.SearchAssets,
+			"description": []string{
+				"Api for finding images loaded in the platform given a query",
+				"term specified in the url. The results are capped at 100 items",
+				"and are limitted to what is currently loaded in the db serving",
+				"the env the api is currently on",
+			},
+		},
+	},
+
 	// store products
 	map[string]map[string]interface{}{
-		"/store/categoryproduct/create/:store_id": {
+		"/store/category/product/create/:store_id": {
 			"control_method": "POST",
 			"authenticate": []string{
 				models.ACCESSROLE_CONFIRMED_USER,

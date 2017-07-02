@@ -1,6 +1,7 @@
 package db
 
 func InitIndicies() {
+	EnsureAssetIndex()
 	EnsureStoreIndex()
 	EnsureCategoryIndex()
 	EnsureProductIndex()
