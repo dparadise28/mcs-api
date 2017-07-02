@@ -37,7 +37,11 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	user.UpdateTokenAndCookie(w)
 	user.ScrubSensitiveInfo()
 	log.Println(info)
-	json.NewEncoder(w).Encode(user)
+
+	// ::TODO:: dynamic external routing for things like this
+	log.Println("redirecting")
+	http.Redirect(w, r, "http://mycorner.store:8003/#/login", http.StatusTemporaryRedirect)
+	//json.NewEncoder(w).Encode(user)
 }
 
 func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId string) {
@@ -100,6 +104,7 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	user.Confirmed = false
 	user.ConfirmationCode = tools.GenerateConfirmationCode()
 	user.Password = tools.HashPassword(user.Password)
+	user.Email = strings.ToLower(user.Email)
 
 	// copy db session for the stores collection and close on completion
 	session := db.Database.Session.Copy()

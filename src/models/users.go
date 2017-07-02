@@ -18,7 +18,6 @@ type User struct {
 	AddressBook      []UserAddress `bson:"address_book" json:"address_book"`
 	Confirmed        bool          `bson:"confirmed" json:"confirmed"`
 	Password         string        `bson:"password" json:"password" validate:"required"`
-	UserName         string        `bson:"username" json:"username" validate:"required"`
 	Email            string        `bson:"email" json:"email" validate:"required,email"`
 	Roles            UserRoles     `bson:"user_roles" json:"user_roles"`
 	// user roles struct is in /src/models/auth
@@ -33,7 +32,6 @@ type UserAPIResponse struct {
 	ID          bson.ObjectId `bson:"_id,omitempty" json:"user_id"`
 	AddressBook []UserAddress `bson:"address_book" json:"address_book"`
 	Confirmed   bool          `bson:"confirmed" json:"confirmed"`
-	UserName    string        `bson:"username" json:"username" validate:"required"`
 	Email       string        `bson:"email" json:"email" validate:"required,email"`
 	Roles       UserRoles     `bson:"user_roles" json:"user_roles"`
 }
@@ -41,10 +39,7 @@ type UserAPIResponse struct {
 func (u *User) EmailConfirmation() Email {
 	// Email struct model can be found in the general.go file
 	emailSubject := "Thank You for signing up!"
-	emailBody := "Welcome! Please click on the following link to confirm your account \n" +
-		"http://mycorner.store:8001/api/user/confirm/email/" + u.ID.Hex() + "/" + u.ConfirmationCode +
-		"\n\n\tUser Id: " + u.ID.Hex() +
-		"\n\tconfirmation code: " + u.ConfirmationCode
+	emailBody := ConirmationEmail(u.ID.Hex(), u.ConfirmationCode, u.Email)
 	return Email{u.Email, emailBody, emailSubject}
 }
 
