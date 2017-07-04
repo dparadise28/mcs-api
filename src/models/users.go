@@ -36,10 +36,23 @@ type UserAPIResponse struct {
 	Roles       UserRoles     `bson:"user_roles" json:"user_roles"`
 }
 
-func (u *User) EmailConfirmation() Email {
+func (u *User) ConfirmUserEmailLink(pw_reset bool) string {
+	link := "http://mycorner.store:8080/api/user/confirm/email/" + u.ID.Hex() + "/" + u.ConfirmationCode
+	if pw_reset {
+		link += "?password=" + u.Password
+	}
+	return link
+}
+
+func (u *User) EmailConfirmation(pw_reset bool) Email {
 	// Email struct model can be found in the general.go file
 	emailSubject := "Thank You for signing up!"
-	emailBody := ConirmationEmail(u.ID.Hex(), u.ConfirmationCode, u.Email)
+	emailBody := ConirmationEmail(
+		u.ID.Hex(),
+		u.ConfirmationCode,
+		u.Email,
+		u.ConfirmUserEmailLink(pw_reset),
+	)
 	return Email{u.Email, emailBody, emailSubject}
 }
 

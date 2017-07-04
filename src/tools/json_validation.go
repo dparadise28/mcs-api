@@ -12,7 +12,9 @@ type DefaultValidator struct {
 }
 
 func (v *DefaultValidator) ValidateIncomingJsonRequest(obj interface{}) models.Error {
-	ValidationError := *models.ErrSuccess
+	ValidationError := models.Error{
+		"SUCCESS", 200, "Successful request", map[string][]string{}, nil,
+	}
 	if KindOfData(obj) == reflect.Struct {
 		v.lazyinit()
 		if err := v.validate.Struct(obj); err != nil {

@@ -12,15 +12,16 @@ var ProductCollectionName = "Products"
 
 type Product struct {
 	ID             bson.ObjectId `bson:"_id" json:"product_id"`
+	Image          bool          `bson:"image" json:"image"`
+	Enabled        bool          `bson:"enabled" json:"enabled"`
 	StoreID        bson.ObjectId `bson:"store_id" json:"store_id"`
 	SortOrder      uint16        `bson:"sort_order" json:"sort_order"`
-	NewCategoryID  bson.ObjectId `bson:"-" json:"new_category_id"`
+	PriceCents     uint32        `bson:"price_cents" json:"price_cents" validate:"required"`
 	CategoryID     bson.ObjectId `bson:"category_id" json:"category_id"`
 	Description    string        `bson:"desc" json:"description"`
 	ProductTitle   string        `bson:"title" json:"title" validate:"required"`
 	DisplayPrice   string        `bson:"-" json:"display_price"`
-	PriceCents     uint32        `bson:"price_cents" json:"price_cents" validate:"required"`
-	Enabled        bool          `bson:"enabled" json:"enabled"`
+	NewCategoryID  bson.ObjectId `bson:"-" json:"new_category_id"`
 	ProductRatings struct {
 		ReviewCount           uint64  `bson:"review_count" json:"total_reviews"`
 		ReviewPercentageScore float64 `bson:"pct_score" json:"review_percent"`
@@ -32,15 +33,16 @@ type Product struct {
 
 type ReadOnlyProduct struct {
 	ID             bson.ObjectId `bson:"_id" json:"product_id"`
+	Image          bool          `bson:"image" json:"image"`
+	Enabled        bool          `bson:"enabled" json:"enabled"`
 	StoreID        bson.ObjectId `bson:"store_id" json:"store_id"`
 	SortOrder      uint16        `bson:"sort_order" json:"sort_order"`
-	NewCategoryID  bson.ObjectId `bson:"-" json:"new_category_id"`
+	PriceCents     uint32        `bson:"price_cents" json:"price_cents" validate:"required"`
 	CategoryID     bson.ObjectId `bson:"category_id" json:"category_id"`
 	Description    string        `bson:"desc" json:"description"`
 	ProductTitle   string        `bson:"title" json:"title" validate:"required"`
 	DisplayPrice   string        `bson:"-" json:"display_price"`
-	PriceCents     uint32        `bson:"price_cents" json:"price_cents" validate:"required"`
-	Enabled        bool          `bson:"enabled" json:"enabled"`
+	NewCategoryID  bson.ObjectId `bson:"-" json:"new_category_id"`
 	PreviousTnxOp  bson.ObjectId `bson:"previoustnxop" json:"-"`
 	ProductRatings struct {
 		ReviewCount           uint64  `bson:"review_count" json:"total_reviews"`
@@ -54,6 +56,7 @@ type ReadOnlyProduct struct {
 type CartProduct struct {
 	//StoreID      bson.ObjectId `bson:"-" json:"store_id"`
 	ID           bson.ObjectId `bson:"_id" json:"product_id"`
+	Image        bool          `bson:"image" json:"image"`
 	Quantity     uint16        `bson:"qty" json:"quantity"`
 	PriceCents   uint32        `bson:"price_cents" json:"price_cents"`
 	ProductTitle string        `bson:"title" json:"title"`
@@ -157,7 +160,13 @@ func (p *ProductOrder) ReorderStoreProducts() error {
 	}
 
 	previousTnx := ReadOnlyProduct{}
-	c.Find(bson.M{"_id": p.PIDS[0]}).One(&previousTnx)
+	c.Find(bson.M{
+		"store_id":    p.SID,
+		"category_id": p.CID,
+		"previoustnxop": bson.M{
+			"$exists": true,
+		},
+	}).One(&previousTnx)
 
 	op_id := bson.NewObjectId()
 	operations := make([]txn.Op, len(p.PIDS))
