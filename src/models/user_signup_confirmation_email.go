@@ -1,6 +1,10 @@
 package models
 
-func ConirmationEmail(uid string, c_code string, u_email string) string {
+func ConirmationEmail(uid string, c_code string, u_email string, c_link string) string {
+	// uid = user id
+	// u_email = user email
+	// c_code = confirmation code
+	// c_link = cofirmation link generated from the method above
 	return `
         <head>
         	<title></title>
@@ -104,7 +108,7 @@ func ConirmationEmail(uid string, c_code string, u_email string) string {
         									</tbody>
         								</table>
         							</div>
-                      <div aria-labelledby="mj-column-per-30" class="mj-column-per-30" style="vertical-align:top;display:inline-block;font-size:13px;text-align:left;width:100%;">
+									<div aria-labelledby="mj-column-per-30" class="mj-column-per-30" style="vertical-align:top;display:inline-block;font-size:13px;text-align:left;width:100%;">
         								<table cellpadding="0" cellspacing="0" width="100%" border="0">
         									<tbody>
         										<tr>
@@ -123,31 +127,6 @@ func ConirmationEmail(uid string, c_code string, u_email string) string {
         										<tr>
         											<td style="word-break:break-word;font-size:0px;padding:0px 0px 25px;" align="left">
         												<div style="cursor:auto;color:#0f1f38;font-family:'Avenir Next', Avenir, sans-serif;font-size:16px;line-height:30px;"> ` + uid + `
-        												</div>
-        											</td>
-        										</tr>
-        									</tbody>
-        								</table>
-        							</div>
-                      <div aria-labelledby="mj-column-per-30" class="mj-column-per-30" style="vertical-align:top;display:inline-block;font-size:13px;text-align:left;width:100%;">
-        								<table cellpadding="0" cellspacing="0" width="100%" border="0">
-        									<tbody>
-        										<tr>
-        											<td style="word-break:break-word;font-size:0px;padding:0px 0px 10px;" align="left">
-        												<div style="cursor:auto;color:#0f1f38;font-family:'Avenir Next', Avenir, sans-serif;font-size:16px;line-height:30px;">
-        													<strong style="font-weight: 500; white-space: nowrap;">Confirmation Code</strong>
-        												</div>
-        											</td>
-        										</tr>
-        									</tbody>
-        								</table>
-        							</div>
-        							<div aria-labelledby="mj-column-per-70" class="mj-column-per-70" style="vertical-align:top;display:inline-block;font-size:13px;text-align:left;width:100%;">
-        								<table cellpadding="0" cellspacing="0" width="100%" border="0">
-        									<tbody>
-        										<tr>
-        											<td style="word-break:break-word;font-size:0px;padding:0px 0px 25px;" align="left">
-        												<div style="cursor:auto;color:#0f1f38;font-family:'Avenir Next', Avenir, sans-serif;font-size:16px;line-height:30px;"> ` + c_code + `
         												</div>
         											</td>
         										</tr>
@@ -187,7 +166,7 @@ func ConirmationEmail(uid string, c_code string, u_email string) string {
         													<tbody>
         														<tr>
         															<td style="border-radius:3px;color:white;cursor:auto;" align="center" valign="middle" bgcolor="#000bb2c">
-                                        <a href="` + "http://mycorner.store:8080/api/user/confirm/email/" + uid + "/" + c_code + `" style="display:inline-block;text-decoration:none;background:#00bb2c;border-radius:3px;color:white;font-family:'Avenir Next', Avenir, sans-serif;font-size:14px;font-weight:500;line-height:35px;padding:10px 25px;margin:0px;" target="_blank">
+                                        <a href="` + c_link + `" style="display:inline-block;text-decoration:none;background:#00bb2c;border-radius:3px;color:white;font-family:'Avenir Next', Avenir, sans-serif;font-size:14px;font-weight:500;line-height:35px;padding:10px 25px;margin:0px;" target="_blank">
         																  VERIFY YOUR ACCOUNT
         																</a>
         															</td>

@@ -21,7 +21,13 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	c := db.Database.C(models.UserCollectionName).With(session)
 	query := bson.M{"$set": bson.M{"confirmed": true, "confirmation_code": ""}}
 	if r.URL.Query().Get("password") != "" {
-		query = bson.M{"$set": bson.M{"confirmed": true, "confirmation_code": "", "password": tools.HashPassword(r.URL.Query().Get("password"))}}
+		query = bson.M{
+			"$set": bson.M{
+				"confirmed":         true,
+				"confirmation_code": "",
+				"password":          r.URL.Query().Get("password"),
+			},
+		}
 	}
 	change := mgo.Change{
 		ReturnNew: true,
@@ -29,19 +35,21 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		Remove:    false,
 		Update:    query,
 	}
-	info, _ := c.Find(bson.M{
+	_, err := c.Find(bson.M{
 		"_id":               bson.ObjectIdHex(ps.ByName("user_id")),
 		"confirmation_code": ps.ByName("confirmation_code"),
 	}).Apply(change, &user)
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
 
 	user.UpdateTokenAndCookie(w)
 	user.ScrubSensitiveInfo()
-	log.Println(info)
 
 	// ::TODO:: dynamic external routing for things like this
 	log.Println("redirecting")
 	http.Redirect(w, r, "http://mycorner.store:8003/#/login", http.StatusTemporaryRedirect)
-	//json.NewEncoder(w).Encode(user)
 }
 
 func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId string) {
@@ -71,18 +79,28 @@ func UserResendConfirmation(w http.ResponseWriter, r *http.Request, ps httproute
 	defer session.Close()
 
 	c := db.Database.C(models.UserCollectionName).With(session)
+
 	change := mgo.Change{
 		ReturnNew: true,
 		Upsert:    false,
 		Remove:    false,
 		Update:    bson.M{"$set": bson.M{"confirmation_code": tools.GenerateConfirmationCode()}},
 	}
-	info, _ := c.Find(bson.M{"email": strings.ToLower(r.URL.Query().Get("email"))}).Apply(change, &user)
-
+	_, err := c.Find(bson.M{"email": strings.ToLower(r.URL.Query().Get("email"))}).Apply(change, &user)
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
 	user.UpdateTokenAndCookie(w)
+
+	reset_pw := false
+	if r.URL.Query().Get("password") != "" {
+		user.Password = tools.HashPassword(r.URL.Query().Get("password"))
+		reset_pw = true
+	}
+	email := user.EmailConfirmation(reset_pw)
+
 	user.Password = ""
-	log.Println(info)
-	email := user.EmailConfirmation()
 	tools.EmailQueue <- &email
 	user.ConfirmationCode = ""
 	json.NewEncoder(w).Encode(user)
@@ -92,7 +110,7 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var user models.User
 	v := new(tools.DefaultValidator)
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		models.WriteError(w, models.ErrBadRequest)
+		models.WriteNewError(w, err)
 		return
 	}
 	if validationErr := v.ValidateIncomingJsonRequest(&user); validationErr.Status != 200 {
@@ -116,7 +134,7 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	}
 
 	user.UpdateTokenAndCookie(w)
-	email := user.EmailConfirmation()
+	email := user.EmailConfirmation(false)
 	user.ScrubSensitiveInfo()
 	tools.EmailQueue <- &email
 	json.NewEncoder(w).Encode(user)

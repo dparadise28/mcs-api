@@ -4,7 +4,6 @@ import (
 	"db"
 	"encoding/json"
 	"github.com/julienschmidt/httprouter"
-	"log"
 	"strconv"
 	//"gopkg.in/mgo.v2/bson"
 	"models"
@@ -27,7 +26,11 @@ func StoreSearch(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	lon_float, _ := strconv.ParseFloat(lon, 1000000)
 	lat_float, _ := strconv.ParseFloat(lat, 1000000)
 	time_int, _ := strconv.Atoi(time)
-	_, resp := store.FindStoresByLocation(lon_float, lat_float, models.MAX_DISTANCE, time_int)
+	err, resp := store.FindStoresByLocation(lon_float, lat_float, models.MAX_DISTANCE, time_int)
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
 	json.NewEncoder(w).Encode(resp)
 }
 
@@ -47,7 +50,11 @@ func GetFullStoreById(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	store.DBSession = store.DB.Session.Copy()
 	defer store.DBSession.Close()
 
-	_, resp := store.RetrieveFullStoreByID(ps.ByName("store_id"))
+	err, resp := store.RetrieveFullStoreByID(ps.ByName("store_id"))
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
 	json.NewEncoder(w).Encode(resp)
 }
 
@@ -59,8 +66,9 @@ func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	v := new(tools.DefaultValidator)
 	if err := json.NewDecoder(r.Body).Decode(&store); err != nil {
-		log.Println(err)
-		models.WriteError(w, models.ErrBadRequest)
+		//log.Println(err)
+		//models.WriteError(w, models.ErrBadRequest)
+		models.WriteNewError(w, err)
 		return
 	}
 	if validationErr := v.ValidateIncomingJsonRequest(&store); validationErr.Status != 200 {
