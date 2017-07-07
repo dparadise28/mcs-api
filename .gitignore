@@ -6,6 +6,8 @@
 # Folders
 _obj
 _test
+bin
+external_dependencies # we wont keep these in the repo (package them up and archive in s3 for safe keeping)
 
 # Architecture specific extensions/prefixes
 *.[568vq]
