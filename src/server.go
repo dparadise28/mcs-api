@@ -5,6 +5,7 @@ import (
 	"db"
 	"flag"
 	"log"
+	"models"
 	"net/http"
 	"networking"
 	"time"
@@ -32,25 +33,56 @@ func RedirectHTTPS(w http.ResponseWriter, req *http.Request) {
 
 }
 
-func InitServer() {
+func init() {
+	//general
 	flag.StringVar(&port, "port", "", "Port input by user when starting server")
+	// mongo
+	flag.StringVar(&db.MongoDBUri, "mongo_db_uri", "", "example: mongodb://<dbuser>:<dbpassword>@<dbhost1>,<dbhost2>,...:<port>/<dbname>")
 	flag.StringVar(&db.AuthDatabase, "db_name", "", "Name of the db you would like to connect to")
-	flag.StringVar(&db.MongoDBUri, "mongo_db_uri", "",
-		"example: mongodb://<dbuser>:<dbpassword>@<dbhost1>,<dbhost2>,...:<port>/<dbname>")
-	flag.StringVar(&tools.EmailPassword, "platform_email_pw", "", "Email password.")
+	// stripe payments
+	flag.StringVar(&models.StripeSK, "stripe_sk", "", "Your stripe secret key")
+	// emails
+	flag.StringVar(&tools.EmailPassword, "platform_email_pw", "", "The password to your platforms email account")
+	flag.StringVar(&tools.PlatformEmail, "platform_email_addr", "", "Your platforms email address (this is used for things like sending confirmation emails)")
+	// aws
+	flag.StringVar(&models.AWS_SECRET_ACCESS_KEY, "aws_secret_access_key", "", "Your aws secret access key")
+	flag.StringVar(&models.AWS_ACCESS_KEY_ID, "aws_access_key_id", "", "Your aws access key id")
+	flag.StringVar(&models.AWS_REGION, "aws_region", "", "Your aws region")
+	flag.StringVar(&models.AWS_S3_BUCKET_NAME, "aws_s3_bucket_name", "", "Your aws s3 bucket name")
+	flag.StringVar(&models.AWS_S3_BUCKET_KEY, "aws_s3_bucket_key", "", "Your aws s3 bucket key")
 	flag.Parse()
-	if len(port) == 0 || len(db.MongoDBUri) == 0 || len(db.AuthDatabase) == 0 || len(tools.EmailPassword) == 0 {
-		panic(`
+	for _, condition := range []bool{
+		len(port) == 0,
+		len(db.MongoDBUri) == 0,
+		len(db.AuthDatabase) == 0,
+		len(models.StripeSK) == 0,
+		len(tools.EmailPassword) == 0,
+		len(tools.PlatformEmail) == 0,
+		len(models.AWS_SECRET_ACCESS_KEY) == 0,
+		len(models.AWS_ACCESS_KEY_ID) == 0,
+		len(models.AWS_REGION) == 0,
+		len(models.AWS_S3_BUCKET_NAME) == 0,
+		len(models.AWS_S3_BUCKET_KEY) == 0,
+	} {
+		if condition {
+			panic(`
 			Must provide a port to start the server on, a db uri to connect to
 			and a db name to use.
 
-			ex: go run server.go --port=443 --db_name=test-db --mongo_db_uri=mongodb://... --platform_email_pw=pa530rd
+			ex: 
+				go run server.go --port=443 \
+								 --db_name=test-db \
+								 --mongo_db_uri=mongodb://... \
+								 --platform_email_pw=pa530rd \
+								 --platform_email_addr=example@domain.com \
+								 --stripe_sk=s3cR3tKey
 		`)
+		}
 	}
+	log.Println()
 }
 
 func main() {
-	InitServer()
 	db.InitSession()
 	db.InitIndicies()
 	defer db.Database.Session.Close()

@@ -27,3 +27,6 @@ go get gopkg.in/gomail.v2
 
 echo cors shit
 go get github.com/rs/cors
+
+echo aws dependancies
+go get -u github.com/aws/aws-sdk-go

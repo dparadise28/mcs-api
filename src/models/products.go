@@ -12,7 +12,8 @@ var ProductCollectionName = "Products"
 
 type Product struct {
 	ID             bson.ObjectId `bson:"_id" json:"product_id"`
-	Image          bool          `bson:"image" json:"image"`
+	Image          string        `bson:"image" json:"image" validate:"required"`
+	AssetID        bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
 	Enabled        bool          `bson:"enabled" json:"enabled"`
 	StoreID        bson.ObjectId `bson:"store_id" json:"store_id"`
 	SortOrder      uint16        `bson:"sort_order" json:"sort_order"`
@@ -34,6 +35,7 @@ type Product struct {
 type ReadOnlyProduct struct {
 	ID             bson.ObjectId `bson:"_id" json:"product_id"`
 	Image          bool          `bson:"image" json:"image"`
+	AssetID        bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
 	Enabled        bool          `bson:"enabled" json:"enabled"`
 	StoreID        bson.ObjectId `bson:"store_id" json:"store_id"`
 	SortOrder      uint16        `bson:"sort_order" json:"sort_order"`
@@ -56,7 +58,8 @@ type ReadOnlyProduct struct {
 type CartProduct struct {
 	//StoreID      bson.ObjectId `bson:"-" json:"store_id"`
 	ID           bson.ObjectId `bson:"_id" json:"product_id"`
-	Image        bool          `bson:"image" json:"image"`
+	Image        bool          `bson:"image" json:"image" validate:"required"`
+	AssetID      bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
 	Quantity     uint16        `bson:"qty" json:"quantity"`
 	PriceCents   uint32        `bson:"price_cents" json:"price_cents"`
 	ProductTitle string        `bson:"title" json:"title"`

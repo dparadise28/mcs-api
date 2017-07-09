@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"log"
@@ -77,7 +78,7 @@ type Store struct {
 	DBSession *mgo.Session  `bson:"-" json:"-"`
 }
 
-func (s *Store) PrepStoreEntitiesForInsert() {
+func (s *Store) PrepStoreEntitiesForInsert() error {
 	s.ID = bson.NewObjectId()
 	s.CategoryNames = []string{}
 	for category_index, _ := range s.CTree {
@@ -90,9 +91,13 @@ func (s *Store) PrepStoreEntitiesForInsert() {
 
 		s.CategoryNames = append(s.CategoryNames, s.CTree[category_index].Name)
 		for product_index, _ := range s.CTree[category_index].Products {
+			if s.CTree[category_index].Products[product_index].AssetID.Hex() == "" {
+				return errors.New("Must provide a valid asset_id for every product.")
+			}
 			p_id := bson.NewObjectId()
 
 			s.CTree[category_index].Products[product_index].ID = p_id
+			s.CTree[category_index].Products[product_index].Enabled = true
 			s.CTree[category_index].Products[product_index].StoreID = s.ID
 			s.CTree[category_index].Products[product_index].CategoryID = c_id
 			s.CTree[category_index].Products[product_index].SortOrder = uint16(product_index)
@@ -100,11 +105,14 @@ func (s *Store) PrepStoreEntitiesForInsert() {
 			s.products = append(s.products, s.CTree[category_index].Products[product_index])
 		}
 	}
+	return nil
 }
 
 func (s *Store) Insert() error {
 	c := s.DB.C(StoreCollectionName).With(s.DBSession)
-	s.PrepStoreEntitiesForInsert()
+	if err := s.PrepStoreEntitiesForInsert(); err != nil {
+		return err
+	}
 	s.Address.Location.Type = "Point"
 	s.Address.Location.Coordinates = []float64{s.Address.Longitude, s.Address.Latitude}
 	if insert_err := c.Insert(&s); insert_err != nil {
@@ -135,9 +143,9 @@ func (s *Store) InsertStoreCategories() error {
 func (s *Store) InsertStoreProducts() error {
 	c := s.DB.C(ProductCollectionName).With(s.DBSession)
 	if insert_err := c.Insert(I(s.products)...); insert_err != nil {
+		log.Println("during products")
+		log.Println(insert_err)
 		if strings.Count(insert_err.Error(), "ObjectId") == 1 {
-			log.Println("during products")
-			log.Println(insert_err)
 			return nil
 		}
 		return insert_err

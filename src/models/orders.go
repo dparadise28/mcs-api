@@ -5,7 +5,10 @@ import (
 	"time"
 )
 
-var OrderCollectionName = "Orders"
+var (
+	OrderCollectionName = "Orders"
+	StripeSK            = ""
+)
 
 var OrderType = map[string]int{
 	"delivery": 0,

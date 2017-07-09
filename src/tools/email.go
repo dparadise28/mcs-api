@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	PlatformEmail = "yourfriends@mycorner.store"
+	PlatformEmail = ""
 	EmailPassword = ""
 	queuePaths    = []string{
 		"queues/email/PENDING/",

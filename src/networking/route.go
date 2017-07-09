@@ -424,6 +424,18 @@ var APIRouteList = []map[string]map[string]interface{}{
 			},
 		},
 	},
+	map[string]map[string]interface{}{
+		"/assets/image/upload": {
+			"control_method": "POST",
+			"authenticate":   []string{},
+			"post_payload":   models.NewAsset{},
+			"max_rps":        nil,
+			"api_method":     api.CreateAsset,
+			"description": []string{
+				"Api for uploading assets",
+			},
+		},
+	},
 
 	// store products
 	map[string]map[string]interface{}{

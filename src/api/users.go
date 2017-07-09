@@ -40,6 +40,7 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		"confirmation_code": ps.ByName("confirmation_code"),
 	}).Apply(change, &user)
 	if err != nil {
+		log.Println(err, ps.ByName("user_id"), ps.ByName("confirmation_code"))
 		models.WriteNewError(w, err)
 		return
 	}
