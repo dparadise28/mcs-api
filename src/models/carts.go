@@ -3,11 +3,16 @@ package models
 import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"log"
 	"time"
 )
 
 var CartCollectionName = "Carts"
+
+var CartStates = map[string]int{
+	"ABANDONED": 0,
+	"ACTIVE":    1,
+	"COMPLETED": 2,
+}
 
 type Totals struct {
 	Subtotal uint32  `bson:"-" json:"subtotal"`
@@ -24,8 +29,7 @@ type Cart struct {
 	StoreID      bson.ObjectId `bson:"store_id" json:"store_id"`
 	Products     []CartProduct `bson:"products" json:"products"`
 	StoreName    string        `bson:"store_name" json:"store_name"`
-	Abandoned    bool          `bson:"abandoned" json:"abandoned"`
-	Active       bool          `bson:"active" json:"active"` // change to enum
+	CartState    int           `bson:"cart_state" json:"cart_state"`
 	DateCreated  time.Time     `bson:"created_at" json:"created_at"`
 	LastUpdated  time.Time     `bson:"last_updated" json:"last_updated"`
 	DeliveryFee  uint32        `bson:"delivery_fee" json:"delivery_fee"`
@@ -55,7 +59,7 @@ func (cart *Cart) UpdateProductQuantityQueries(p CartProduct) []bson.M {
 		},
 		"$set": bson.M{
 			"last_updated": cart.LastUpdated,
-			"active":       true,
+			"cart_state":   CartStates["ACTIVE"],
 		},
 	}
 	// supper hacky (generally want to come up with a better appraoch but will do for now)
@@ -70,7 +74,7 @@ func (cart *Cart) UpdateProductQuantityQueries(p CartProduct) []bson.M {
 				"last_updated": cart.LastUpdated,
 				"delivery_fee": cart.DeliveryFee,
 				"tax_rate":     cart.StoreTaxRate,
-				"active":       true,
+				"cart_state":   CartStates["ACTIVE"],
 			},
 		}
 	}
@@ -87,15 +91,38 @@ func (cart *Cart) RunUpsertQueries(queries []bson.M) error {
 			Update:    query,
 		}
 		_, err := c.Find(bson.M{
-			"_id":       cart.ID,
-			"user_id":   cart.UserID,
-			"store_id":  cart.StoreID,
-			"active":    true,
-			"abandoned": false,
+			"_id":        cart.ID,
+			"user_id":    cart.UserID,
+			"store_id":   cart.StoreID,
+			"cart_state": CartStates["ACTIVE"],
 		}).Apply(change, cart)
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (cart *Cart) AbandonCart() error {
+	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
+	change := mgo.Change{
+		ReturnNew: true,
+		Upsert:    false,
+		Remove:    false,
+		Update: bson.M{
+			"$set": bson.M{
+				"last_updated": time.Now(),
+				"cart_state":   CartStates["ABANDONED"],
+			},
+		},
+	}
+	_, err := c.Find(bson.M{
+		"_id":        cart.ID,
+		"user_id":    cart.UserID,
+		"cart_state": CartStates["ACTIVE"],
+	}).Apply(change, cart)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -116,7 +143,6 @@ func (cart *Cart) UpdateProductQuantity(id bson.ObjectId, instructions string, q
 		"store_id": cart.StoreID,
 	}
 	if err := p_collection.Find(pQuery).One(&p); err != nil || p.PriceCents == 0 {
-		log.Println(err)
 		return err
 	}
 	p.Instructions = instructions
@@ -128,4 +154,27 @@ func (cart *Cart) UpdateProductQuantity(id bson.ObjectId, instructions string, q
 	}
 	cart.UpdateCartTotals()
 	return nil
+}
+
+func (cart *Cart) RetrieveUserActiveCarts(u_id string) ([]Cart, error) {
+	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
+
+	var carts []Cart
+	err := c.Find(bson.M{
+		"user_id":    bson.ObjectIdHex(u_id),
+		"cart_state": CartStates["ACTIVE"],
+	}).All(&carts)
+	for cartIndex, _ := range carts {
+		carts[cartIndex].UpdateCartTotals()
+	}
+	return carts, err
+}
+
+func (cart *Cart) ActiveUserCartCountForStore() (int, error) {
+	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
+	return c.Find(bson.M{
+		"user_id":    cart.UserID,
+		"store_id":   cart.StoreID,
+		"cart_state": CartStates["ACTIVE"],
+	}).Count()
 }

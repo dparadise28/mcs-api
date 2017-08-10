@@ -3,6 +3,7 @@ package api
 import (
 	"db"
 	"encoding/json"
+	"errors"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -168,4 +169,109 @@ func Login(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	}
 	user.ScrubSensitiveInfo()
 	json.NewEncoder(w).Encode(user)
+}
+
+func AddUserAddrToAddrBook(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var addr models.Address
+	addr.DB = db.Database
+	if err := json.NewDecoder(r.Body).Decode(&addr); err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
+	v := new(tools.DefaultValidator)
+	if validationErr := v.ValidateIncomingJsonRequest(&addr); validationErr.Status != 200 {
+		models.WriteError(w, &validationErr)
+		return
+	}
+	if addr.Name == "" {
+		models.WriteNewError(w, errors.New(
+			"Please provide the name associated with this address.",
+		))
+		return
+	}
+	addr.UserID = bson.ObjectIdHex(r.Header.Get(models.USERID_COOKIE_NAME))
+	addr.DBSession = addr.DB.Session.Copy()
+	defer addr.DBSession.Close()
+
+	err := addr.AddToUserAddressBook()
+	log.Println(err)
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(addr)
+}
+
+func RemoveUserAddrFromAddrBook(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var addr models.Address
+	addr.DB = db.Database
+	addr.DBSession = addr.DB.Session.Copy()
+	defer addr.DBSession.Close()
+
+	if r.URL.Query().Get("address_id") == "" {
+		models.WriteNewError(w, errors.New(
+			"You must provide an address_id in the query params associated "+
+				"with the address you'd like to remove.",
+		))
+	}
+	addr.UserID = bson.ObjectIdHex(r.Header.Get(models.USERID_COOKIE_NAME))
+	addr.ID = bson.ObjectIdHex(r.URL.Query().Get("address_id"))
+	err := addr.RemoveFromUserAddressBook()
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(addr)
+}
+
+func UpdateUserDefaultInAddrBook(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var addr models.Address
+	addr.DB = db.Database
+	addr.DBSession = addr.DB.Session.Copy()
+	defer addr.DBSession.Close()
+
+	if r.URL.Query().Get("address_id") == "" {
+		models.WriteNewError(w, errors.New(
+			"You must provide an address_id in the query params associated "+
+				"with the address you'd like to set as your new default.",
+		))
+	}
+	addr.UserID = bson.ObjectIdHex(r.Header.Get(models.USERID_COOKIE_NAME))
+	addr.NewDefaultID = bson.ObjectIdHex(r.URL.Query().Get("address_id"))
+	err := addr.ChangeDefaultAddressInUserAddressBook()
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(addr)
+}
+
+func GetUserAddrBook(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var addr models.Address
+	addr.DB = db.Database
+	addr.DBSession = addr.DB.Session.Copy()
+	defer addr.DBSession.Close()
+
+	addr.UserID = bson.ObjectIdHex(r.Header.Get(models.USERID_COOKIE_NAME))
+	addrs, err := addr.RetrieveUserAddressBook()
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(addrs)
+}
+
+func GetUserDefaultAddr(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var addr models.Address
+	addr.DB = db.Database
+	addr.DBSession = addr.DB.Session.Copy()
+	defer addr.DBSession.Close()
+
+	addr.UserID = bson.ObjectIdHex(r.Header.Get(models.USERID_COOKIE_NAME))
+	err := addr.RetrieveUserDefaultAddressInAddressBook()
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(addr)
 }

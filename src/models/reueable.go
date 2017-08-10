@@ -16,19 +16,8 @@ type GeoJson struct {
 	Coordinates []float64 `json:"coordinates"`
 }
 
-type Address struct {
-	Route         string  `bson:"route" json:"route"`
-	Country       string  `bson:"country" json:"country"`
-	Location      GeoJson `bson:"location" json:"location"`
-	Latitude      float64 `bson:"latitude" json:"latitude" validate:"required"`
-	Longitude     float64 `bson:"longitude" json:"longitude" validate:"required"`
-	PostalCode    string  `bson:"postal_code" json:"postal_code"`
-	StreetNumber  string  `bson:"street_number" json:"street_number"`
-	AdminAreaLvl1 string  `bson:"administrative_area_level_1" json:"administrative_area_level_1"`
-}
-
 type Hours struct {
-	From uint16 `json:"from" validate:"ltefield=To"`
+	From uint16 `json:"from" validate:"ltecsfield=To"`
 	To   uint16 `json:"to"`
 }
 
@@ -48,4 +37,11 @@ func I(array interface{}) []interface{} {
 	}
 
 	return result
+}
+
+func Keys(m map[string]interface{}) (keys []string) {
+	for key := range m {
+		keys = append(keys, key)
+	}
+	return
 }

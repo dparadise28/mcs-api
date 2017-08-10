@@ -7,4 +7,5 @@ func InitIndicies() {
 	EnsureProductIndex()
 	EnsureUserIndex()
 	EnsureCartIndex()
+	EnsureAddressIndex()
 }

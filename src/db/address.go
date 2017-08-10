@@ -5,22 +5,11 @@ import (
 	"models"
 )
 
-var CartIndex = []mgo.Index{
+var AddrIndex = []mgo.Index{
 	mgo.Index{
 		Key: []string{
 			"user_id",
-			"store_id",
-			"cart_state",
-		},
-		Unique:     false,
-		DropDups:   true,
-		Background: true,
-		Sparse:     true,
-	},
-	mgo.Index{
-		Key: []string{
-			"store_id",
-			"cart_state",
+			"default",
 		},
 		Unique:     false,
 		DropDups:   true,
@@ -30,21 +19,21 @@ var CartIndex = []mgo.Index{
 	mgo.Index{
 		Key: []string{
 			"user_id",
-			"cart_state",
+			"location.coordinates",
 		},
-		Unique:     false,
+		Unique:     true,
 		DropDups:   true,
 		Background: true,
 		Sparse:     true,
 	},
 }
 
-func EnsureCartIndex() {
+func EnsureAddressIndex() {
 	session := Database.Session.Copy()
 	defer session.Close()
-	c := Database.C(models.CartCollectionName).With(session)
 
-	for _, index := range CartIndex {
+	c := Database.C(models.AddressCollectionName).With(session)
+	for _, index := range AddrIndex {
 		err := c.EnsureIndex(index)
 		if err != nil {
 			panic(err)

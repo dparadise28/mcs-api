@@ -77,6 +77,15 @@ var APIRouteList = []map[string]map[string]interface{}{
 				"		3) itterate through the permissions in the auth array here",
 				"		   and check if they are contained in the value retrieved in",
 				"		   step 2.",
+				"",
+				"",
+				"Helper/Convenience apis:",
+				"	In general these are supper lightweight apis and can be called",
+				"	liberally (as always, within reason). These convenience apis",
+				"	will become more useful as the platform grows and the number",
+				"	of conventions we need to maintain grows with it. You can use",
+				"	the results to help form valid store creation requests and",
+				"	the like.",
 			},
 		},
 	},
@@ -209,14 +218,99 @@ var APIRouteList = []map[string]map[string]interface{}{
 			},
 		},
 	},
+	map[string]map[string]interface{}{
+		"/user/address_book/add": {
+			"control_method": "POST",
+			"post_payload":   models.Address{},
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.AddUserAddrToAddrBook,
+			"description": []string{
+				"Uniqueness of address records are quarenteed for (user_id, long, lat) pairs.",
+				"This is not necessarily an atomic transaction. A count of the number of defaults",
+				"in a users address book is retrieved. If a request is made to add the first",
+				"address then that address is set as the default (irrespective of the state",
+				"of the default field in the request payload). If the number of defaults for",
+				"for the users address book associated with the request is greater then 0 and",
+				"the request payload has the default flag set to true then the current defaults",
+				"will be reset to false and the new address will become the users default address.",
+				"In general it should be either 0 or 1; any other state is an edge case that is",
+				"unintended and should not happen but is accounted for in the case of unforseen",
+				"ways of acquiring unexpected states. In the case of the default flag being set",
+				"to false and the number of defaults in the addr book is > 0 then a regular write",
+				"is attempted.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/user/address_book/retrieve": {
+			"control_method": "GET",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.GetUserAddrBook,
+			"description": []string{
+				"Nothing really special about this guy. It simply responds with the users full",
+				"address book in no guarenteed order.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/user/address_book/retrieve/default": {
+			"control_method": "GET",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.GetUserDefaultAddr,
+			"description": []string{
+				"Just a helper api to return the users default address.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/user/address_book/default/change": {
+			"control_method": "GET",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.UpdateUserDefaultInAddrBook,
+			"description": []string{
+				"Update users default address by setting any current defaults in the users address",
+				"book to regular addresses and updating the record associated with the required query",
+				"param argument (address_id) to be the default new default.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/user/address_book/remove_by_id": {
+			"control_method": "GET",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.RemoveUserAddrFromAddrBook,
+			"description": []string{
+				"Exactly what is sounds like. The only (intentional) gotchya here is that a default",
+				"address may not be removed. You must change the default address first and then remove",
+				"the address no longer needed. This is done so that we always have a default address",
+				"for a user (if at least one address is stored). That way the client is more likely",
+				"to perform searches while making the users standard experience one step simpler.",
+			},
+		},
+	},
 
 	// stores api
 	map[string]map[string]interface{}{
 		"/store/create": {
 			"control_method": "POST",
 			"post_payload":   models.Store{},
-			"authenticate":   []string{
-			//models.ACCESSROLE_CONFIRMED_USER,
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
 			},
 			"max_rps":    nil,
 			"api_method": api.StoreCreate,
@@ -259,13 +353,27 @@ var APIRouteList = []map[string]map[string]interface{}{
 		},
 	},
 	map[string]map[string]interface{}{
-		"/store/info/:store_id": {
+		"/store/info/retrieve/:store_id": {
 			"control_method": "GET",
 			"authenticate":   []string{},
 			"max_rps":        nil,
 			"api_method":     api.GetStoreById,
 			"description": []string{
 				"This call retuns a full store without any products",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/store/info/update/:store_id": {
+			"control_method": "POST",
+			"post_payload":   models.Store{},
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.StoreInfoUpdate,
+			"description": []string{
+				"Store info update call.",
 			},
 		},
 	},
@@ -529,9 +637,11 @@ var APIRouteList = []map[string]map[string]interface{}{
 		"/cart/update/product/quantity": {
 			"control_method": "POST",
 			"post_payload":   models.CartRequest{},
-			"authenticate":   []string{},
-			"max_rps":        nil,
-			"api_method":     api.UpdateCartProductQuantity,
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.UpdateCartProductQuantity,
 			"description": []string{
 				"This api is meant to mutate the state of your cart.",
 				"If you have never made this call before the payload will",
@@ -546,7 +656,141 @@ var APIRouteList = []map[string]map[string]interface{}{
 				"abandoned carts (an abandoned cart is simply an inactive cart",
 				"that was never checked out) we can work on this feature.",
 				"",
+				"Another thing we may want to do is update this api to track",
+				"previous quantities and not only final quantity states prior",
+				"to cart state changes (active, abandoned, completed) to retain",
+				"a full picture of realstive user interactions. Howevere without",
+				"any data modeling to determine the necessity of such tracking",
+				"its hard to justify the cost with respect to the additional",
+				"effort required to implement such a feature given no data",
+				"equates to a lack of evidence of those actions being meaningful",
+				"to analytical inferences. We will probably do this when there",
+				"is sufficient volume flowing through the system that will allow",
+				"us to intelligently make such decisions.",
+				"",
 				"There is still much to do with carts. One big one is guest carts",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/carts/retrieve/active": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.RetrieveUserActiveCarts,
+			"description": []string{
+				"Retrieve all active carts for the user identified by the id in",
+				"the url structure associated with the call.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/cart/abandon/:cart_id": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.AbandonUserActiveCart,
+			"description": []string{
+				"This is analogous to a clear/drop cart button you would",
+				"normally see on a ui. We do not delete carts. We simply",
+				"update their state to reflect the user is no longer interested",
+				"in their cart in its current state. We do this for future",
+				"analytics inferences we may want to make from user interations.",
+			},
+		},
+	},
+
+	// payments
+	map[string]map[string]interface{}{
+		"/payment/store/create/account": {
+			"control_method": "POST",
+			"post_payload":   models.Store{},
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.CreateStoreStripeCustomAccount,
+			"description": []string{
+				"create a new custom stripe account for onboarding stores",
+			},
+		},
+	},
+
+	// constants
+	map[string]map[string]interface{}{
+		"/helper/payment/methods": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.PaymentMethods,
+			"description": []string{
+				"Just a little helper method to expose the currently availible",
+				"payment methods.",
+				"This is a supper lightweight method and can be",
+				"called liberally (as always, within reason). These convenience",
+				"methods will become more useful as the platform grows and the",
+				"number of conventions we need to maintain grows with it. You can",
+				"use the results to help form valid store creation requests and",
+				"the like.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/helper/order/methods": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.OrderMethods,
+			"description": []string{
+				"Another convenince method for exposing currently availible order",
+				"methods.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/helper/order/statuses/all": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.AllOrderStatuses,
+			"description": []string{
+				"Convenince method for exposing all currently supported order",
+				"statuses for the various order methods.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/helper/order/statuses/delivery": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.DeliveryOrderStatuses,
+			"description": []string{
+				"Convenince method for exposing currently supported delivery order",
+				"statuses.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/helper/order/statuses/pickup": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.PickupOrderStatuses,
+			"description": []string{
+				"Convenince method for exposing currently supported pickup order",
+				"statuses.",
 			},
 		},
 	},

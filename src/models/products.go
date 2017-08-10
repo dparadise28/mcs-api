@@ -34,7 +34,7 @@ type Product struct {
 
 type ReadOnlyProduct struct {
 	ID             bson.ObjectId `bson:"_id" json:"product_id"`
-	Image          bool          `bson:"image" json:"image"`
+	Image          string        `bson:"image" json:"image"`
 	AssetID        bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
 	Enabled        bool          `bson:"enabled" json:"enabled"`
 	StoreID        bson.ObjectId `bson:"store_id" json:"store_id"`
@@ -58,7 +58,7 @@ type ReadOnlyProduct struct {
 type CartProduct struct {
 	//StoreID      bson.ObjectId `bson:"-" json:"store_id"`
 	ID           bson.ObjectId `bson:"_id" json:"product_id"`
-	Image        bool          `bson:"image" json:"image" validate:"required"`
+	Image        string        `bson:"image" json:"image" validate:"required"`
 	AssetID      bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
 	Quantity     uint16        `bson:"qty" json:"quantity"`
 	PriceCents   uint32        `bson:"price_cents" json:"price_cents"`
@@ -79,8 +79,7 @@ type CartRequest struct {
 	SID          bson.ObjectId `json:"store_id" validate:"required"`
 	PID          bson.ObjectId `json:"product_id" validate:"required"`
 	CID          bson.ObjectId `json:"cart_id"`
-	QTY          uint16        `json:"quantity" validate:"required"`
-	IsNewCart    bool          `json:"is_new_cart"`
+	QTY          uint16        `json:"quantity" validate:"gte=0"`
 	Instructions string        `json:"instructions"`
 }
 

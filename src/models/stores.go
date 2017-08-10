@@ -13,18 +13,18 @@ const StoreCollectionName = "Stores"
 var MAX_DISTANCE = 1609.34 * 2 // max distance is static for now (2 mi)
 
 type OpenHours struct {
-	Hours  Hours `json:"hours"`
-	IsOpen bool  `json:"open"`
+	Hours  Hours `json:"hours"  validate:"dive"`
+	IsOpen bool  `json:"open" validate:"required"`
 }
 
 type WeeklyWorkingHours struct {
-	Sun OpenHours `bson:"sun" json:"sunday"`
-	Mon OpenHours `bson:"mon" json:"monday"`
-	Tue OpenHours `bson:"tue" json:"tuesday"`
-	Wed OpenHours `bson:"wed" json:"wednesday"`
-	Thu OpenHours `bson:"thu" json:"thursday"`
-	Fri OpenHours `bson:"fri" json:"friday"`
-	Sat OpenHours `bson:"sat" json:"saturday"`
+	Sun OpenHours `bson:"sun" json:"sunday" validate:"required,dive"`
+	Mon OpenHours `bson:"mon" json:"monday" validate:"required,dive"`
+	Tue OpenHours `bson:"tue" json:"tuesday" validate:"required,dive"`
+	Wed OpenHours `bson:"wed" json:"wednesday" validate:"required,dive"`
+	Thu OpenHours `bson:"thu" json:"thursday" validate:"required,dive"`
+	Fri OpenHours `bson:"fri" json:"friday" validate:"required,dive"`
+	Sat OpenHours `bson:"sat" json:"saturday" validate:"required,dive"`
 }
 
 type StoreDelivery struct {
@@ -47,20 +47,22 @@ type StorePickup struct {
 	PickupItemCount struct {
 		Min uint8  `json:"min" validate:"max=255,min=1"`
 		Max uint32 `json:"max" validate:"max=4294967295,min=1"`
-	} `bson:"pickup_items" json:"pickup_items"`
+	} `bson:"pickup_items" json:"pickup_items,dive"`
 }
 
 type Store struct {
 	ID              bson.ObjectId      `bson:"_id,omitempty" json:"store_id"`
 	Name            string             `bson:"name" json:"name"`
 	Image           string             `json:"image"`
-	Phone           uint64             `json:"phone" validate:"required"`
-	Pickup          StorePickup        `json:"pickup"`
-	Address         Address            `json:"address"`
+	Phone           string             `json:"phone" validate:"required"`
+	Email           string             `json:"email" validate:"required,email"`
+	Pickup          StorePickup        `json:"pickup" validate:"required,dive"`
+	Address         Address            `json:"address" validate:"required,dive"`
 	TaxRate         float64            `bson:"tax_rate" json:"tax_rate" validate:"required"`
-	Delivery        StoreDelivery      `json:"delivery"`
+	Enabled         bool               `bson:"enabled" json:"enabled"`
+	Delivery        StoreDelivery      `json:"delivery" validate:"dive"`
 	Distance        float64            `bson:"distance,omitempty" json:"distance,omitempty"`
-	WorkingHours    WeeklyWorkingHours `bson:"working_hours" json:"working_hours" validate:"required"`
+	WorkingHours    WeeklyWorkingHours `bson:"working_hours" json:"working_hours" validate:"required,dive"`
 	LongDescription string             `bson:"long_desc" json:"long_description" validate:"max=200"`
 	// this field has has a fulltext index for
 	// full text search so must so we must
@@ -69,8 +71,28 @@ type Store struct {
 	// search solution or building one
 	ShortDescription string `bson:"short_desc" json:"short_description" validate:"max=50"`
 
+	BusinessType           string   `json:"business_type" bson:"business_type" validate:"required"`
+	AcceptedPaymentMethods []string `bson:"accepted_payment_methods" json:"accepted_payment_methods" validate:"required,min=0"`
+	StripeAccountID        string   `bson:"stripe_custom_account_id" json:"-"`
+	LegalEntity            struct {
+		BillingAddress Address `json:"billing_address" bson:"billing_address" validate:"required,dive"`
+		BusinessTaxID  string  `json:"business_tax_id" bson:"-"`
+		BusinessName   string  `json:"legal_business_name" bson:"legal_business_name" validate:"required"`
+		PersonalID     string  `json:"personal_id" bson:"-"`
+		SSNLast4       string  `json:"last_4_ssn" bson:"-" validate:"max=4,min=4"`
+		Owner          struct {
+			First string `validate:"required"`
+			Last  string `validate:"required"`
+			DOB   struct {
+				Day   uint8  `json:"day" validate:"required"`
+				Month uint8  `json:"month" validate:"required"`
+				Year  uint16 `json:"year" validate:"required"`
+			} `validate:"required,dive"`
+		} `validate:"required,dive"`
+	} `json:"legal_entity" bson:"legal_entity" validate:"dive"`
+
 	CategoryNames []string        `bson:"c_names" json:"category_names"`
-	CTree         []StoreCategory `bson:"-" json:"categories" validate:"required"`
+	CTree         []StoreCategory `bson:"-" json:"categories" validate:"required,dive"`
 
 	products []Product `bson:"-" json:"-"`
 
@@ -159,6 +181,7 @@ func (s *Store) RetrieveStoreByID(id string) error {
 	}
 	c := s.DB.C(StoreCollectionName).With(s.DBSession)
 	err := c.Find(query).One(s)
+	log.Println(err)
 	return err
 }
 
@@ -199,17 +222,18 @@ func (s *Store) RetrieveFullStoreByID(id string) (error, bson.M) {
 		bson.M{
 			"$group": bson.M{
 				"_id":               "$_id",
-				"categories":        bson.M{"$push": "$categories"},
-				"working_hours":     bson.M{"$first": "$working_hours"},
-				"image":             bson.M{"$first": "$image"},
-				"delivery":          bson.M{"$first": "$delivery"},
-				"phone":             bson.M{"$first": "$phone"},
-				"tax_rate":          bson.M{"$first": "$tax_rate"},
-				"address":           bson.M{"$first": "$address"},
-				"long_description":  bson.M{"$first": "$long_desc"},
-				"distance":          bson.M{"$first": "$distance"},
 				"name":              bson.M{"$first": "$name"},
+				"image":             bson.M{"$first": "$image"},
+				"phone":             bson.M{"$first": "$phone"},
 				"pickup":            bson.M{"$first": "$pickup"},
+				"address":           bson.M{"$first": "$address"},
+				"delivery":          bson.M{"$first": "$delivery"},
+				"tax_rate":          bson.M{"$first": "$tax_rate"},
+				"distance":          bson.M{"$first": "$distance"},
+				"categories":        bson.M{"$push": "$categories"},
+				"legal_entity":      bson.M{"$first": "$legal_entity"},
+				"working_hours":     bson.M{"$first": "$working_hours"},
+				"long_description":  bson.M{"$first": "$long_desc"},
 				"short_description": bson.M{"$first": "$short_desc"},
 			},
 		},
@@ -243,4 +267,33 @@ func (s *Store) FindStoresByLocation(long float64, lat float64, maxDist float64,
 	stores := []bson.M{}
 	err := c.Find(query).All(&stores)
 	return err, stores
+}
+
+func (s *Store) UpdateStoreInfo() {
+	c := s.DB.C(StoreCollectionName).With(s.DBSession)
+	change := mgo.Change{
+		ReturnNew: true,
+		Upsert:    false,
+		Remove:    false,
+		Update: bson.M{
+			"$set": bson.M{
+				"name":          s.Name,
+				"image":         s.Image,
+				"email":         s.Email,
+				"phone":         s.Phone,
+				"pickup":        s.Pickup,
+				"address":       s.Address,
+				"delivery":      s.Delivery,
+				"tax_rate":      s.TaxRate,
+				"distance":      s.Distance,
+				"long_desc":     s.LongDescription,
+				"short_desc":    s.ShortDescription,
+				"working_hours": s.WorkingHours,
+			},
+		},
+	}
+	info, _ := c.Find(bson.M{
+		"_id": s.ID,
+	}).Apply(change, s)
+	log.Println(info)
 }

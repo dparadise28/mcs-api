@@ -7,15 +7,11 @@ import (
 
 var UserCollectionName = "Users"
 
-type UserAddress struct {
-	AddressName string  `bson:"address_name" json:"address_name"`
-	Location    GeoJson `bson:"location" json:"location"`
-}
-
 type User struct {
 	ID               bson.ObjectId `bson:"_id,omitempty" json:"user_id"`
 	ConfirmationCode string        `bson:"confirmation_code" json:"confirmation_code"`
-	AddressBook      []UserAddress `bson:"address_book" json:"address_book"`
+	AddressBook      []Address     `bson:"address_book" json:"address_book"`
+	DefaultAddr      bson.ObjectId `bson:"default_address" json:"default_address"`
 	Confirmed        bool          `bson:"confirmed" json:"confirmed"`
 	Password         string        `bson:"password" json:"password" validate:"required"`
 	Email            string        `bson:"email" json:"email" validate:"required,email"`
@@ -29,11 +25,31 @@ type User struct {
 }
 
 type UserAPIResponse struct {
-	ID          bson.ObjectId `bson:"_id,omitempty" json:"user_id"`
-	AddressBook []UserAddress `bson:"address_book" json:"address_book"`
-	Confirmed   bool          `bson:"confirmed" json:"confirmed"`
-	Email       string        `bson:"email" json:"email" validate:"required,email"`
-	Roles       UserRoles     `bson:"user_roles" json:"user_roles"`
+	ID bson.ObjectId `bson:"_id,omitempty" json:"user_id"`
+	//AddressBook []UserAddress `bson:"address_book" json:"address_book"`
+	Confirmed bool      `bson:"confirmed" json:"confirmed"`
+	Email     string    `bson:"email" json:"email" validate:"required,email"`
+	Roles     UserRoles `bson:"user_roles" json:"user_roles"`
+}
+
+func (a *Address) AddAddressToUserAddressBook(u_id bson.ObjectId) error {
+	c := a.DB.C(UserCollectionName).With(a.DBSession)
+	a.Location.Coordinates = []float64{a.Latitude, a.Latitude}
+	pushQuery := bson.M{
+		"$push": bson.M{
+			"address_book": a,
+		},
+	}
+	change := mgo.Change{
+		ReturnNew: true,
+		Upsert:    false,
+		Remove:    false,
+		Update:    pushQuery,
+	}
+	_, err := c.Find(bson.M{
+		"_id": u_id,
+	}).Apply(change, a)
+	return err
 }
 
 func (u *User) ConfirmUserEmailLink(pw_reset bool) string {
@@ -47,6 +63,9 @@ func (u *User) ConfirmUserEmailLink(pw_reset bool) string {
 func (u *User) EmailConfirmation(pw_reset bool) Email {
 	// Email struct model can be found in the general.go file
 	emailSubject := "Thank You for signing up!"
+	if pw_reset {
+		emailSubject = "Forgot your password ehy?"
+	}
 	emailBody := ConirmationEmail(
 		u.ID.Hex(),
 		u.ConfirmationCode,
