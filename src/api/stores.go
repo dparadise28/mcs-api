@@ -99,10 +99,6 @@ func StoreAddCCPaymentMethod(w http.ResponseWriter, r *http.Request, ps httprout
 		models.WriteError(w, &validationErr)
 		return
 	}
-	if err := store.CheckPaymentMethods(); err != nil {
-		models.WriteNewError(w, err)
-		return
-	}
 	act, err := CreateStoreStripeCustomAccountImpl(w, r, ps, &store)
 	if err != nil {
 		models.WriteNewError(w, err)

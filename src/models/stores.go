@@ -68,11 +68,12 @@ type LegalEntity struct {
 }
 
 type StorePaymentDetails struct {
-	StoreID                bson.ObjectId `bson:"store_id,omitempty" json:"store_id"`
-	LegalEntity            LegalEntity   `json:"legal_entity" bson:"legal_entity" validate:"dive"`
-	BusinessType           string        `json:"business_type" bson:"business_type" validate:"required"`
-	StripeAccountID        string        `bson:"stripe_custom_account_id" json:"-"`
-	AcceptedPaymentMethods []string      `bson:"accepted_payment_methods" json:"accepted_payment_methods" validate:"required,min=0"`
+	StoreID            bson.ObjectId `bson:"store_id,omitempty" json:"store_id"`
+	LegalEntity        LegalEntity   `json:"legal_entity" bson:"legal_entity" validate:"dive"`
+	BusinessType       string        `json:"business_type" bson:"business_type" validate:"required"`
+	StripeAccountID    string        `bson:"stripe_custom_account_id" json:"-"`
+	AcceptsCCPayment   bool          `bson:"cc_payment_available" json:"cc_payment_available"`
+	AcceptsCashPayment bool          `bson:"cash_payment_available" json:"cash_payment_available"`
 
 	DB        *mgo.Database `bson:"-" json:"-"`
 	DBSession *mgo.Session  `bson:"-" json:"-"`
@@ -110,6 +111,10 @@ type Store struct {
 }
 
 func (s *Store) PrepStoreEntitiesForInsert() error {
+	s.PaymentDetails.AcceptsCCPayment = false
+	s.PaymentDetails.AcceptsCashPayment = true
+	s.Enabled = true
+
 	s.ID = bson.NewObjectId()
 	s.CategoryNames = []string{}
 	for category_index, _ := range s.CTree {
@@ -309,6 +314,7 @@ func (s *Store) UpdateStoreInfo() {
 
 func (s *Store) AddStoreCCPaymentMethod() {
 	c := s.DB.C(StoreCollectionName).With(s.DBSession)
+	s.PaymentDetails.AcceptsCCPayment = true
 	change := mgo.Change{
 		ReturnNew: true,
 		Upsert:    false,
@@ -323,15 +329,4 @@ func (s *Store) AddStoreCCPaymentMethod() {
 		"_id": s.ID,
 	}).Apply(change, s)
 	log.Println(info)
-}
-
-func (s *Store) CheckPaymentMethods() error {
-	for _, payment_method := range s.PaymentDetails.AcceptedPaymentMethods {
-		if _, ok := CONST_MAP[PAYMENT_METHODS_KEY][payment_method]; !ok {
-			return errors.New(
-				"payment_method values must be in the set of " + strings.Join(PaymentMethods, ", "),
-			)
-		}
-	}
-	return nil
 }
