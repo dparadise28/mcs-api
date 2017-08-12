@@ -8,14 +8,15 @@ import (
 var UserCollectionName = "Users"
 
 type User struct {
-	ID               bson.ObjectId `bson:"_id,omitempty" json:"user_id"`
-	ConfirmationCode string        `bson:"confirmation_code" json:"confirmation_code"`
-	AddressBook      []Address     `bson:"address_book" json:"address_book"`
-	DefaultAddr      bson.ObjectId `bson:"default_address" json:"default_address"`
-	Confirmed        bool          `bson:"confirmed" json:"confirmed"`
-	Password         string        `bson:"password" json:"password" validate:"required"`
-	Email            string        `bson:"email" json:"email" validate:"required,email"`
-	Roles            UserRoles     `bson:"user_roles" json:"user_roles"`
+	ID               bson.ObjectId     `bson:"_id,omitempty" json:"user_id"`
+	ConfirmationCode string            `bson:"confirmation_code" json:"confirmation_code"`
+	AddressBook      []Address         `bson:"address_book" json:"address_book"`
+	DefaultAddr      bson.ObjectId     `bson:"default_address" json:"default_address"`
+	Confirmed        bool              `bson:"confirmed" json:"confirmed"`
+	Password         string            `bson:"password" json:"password" validate:"required"`
+	Email            string            `bson:"email" json:"email" validate:"required,email"`
+	Roles            UserRoles         `bson:"user_roles" json:"user_roles"`
+	Stores           map[string]string `bson:"store_map" json:"store_map"`
 	// user roles struct is in /src/models/auth
 
 	Login struct {

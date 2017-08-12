@@ -68,12 +68,22 @@ func UpdateCartProductQuantity(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 func RetrieveUserActiveCarts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	RetrieveUserCartsByStatus(w, r, ps, models.CartStates["ACTIVE"])
+}
+
+func RetrieveUserCompletedCarts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	RetrieveUserCartsByStatus(w, r, ps, models.CartStates["COMPLETED"])
+}
+
+func RetrieveUserCartsByStatus(w http.ResponseWriter, r *http.Request, ps httprouter.Params, status int) {
 	var cart models.Cart
 	cart.DB = db.Database
 	cart.DBSession = cart.DB.Session.Copy()
+	cart.UserID = bson.ObjectIdHex(r.Header.Get(models.USERID_COOKIE_NAME))
+	cart.CartState = status
 	defer cart.DBSession.Close()
 
-	carts, err := cart.RetrieveUserActiveCarts(r.Header.Get(models.USERID_COOKIE_NAME))
+	carts, err := cart.RetrieveUserCartsByStatus()
 	if err != nil {
 		models.WriteNewError(w, err)
 		return
@@ -90,6 +100,21 @@ func AbandonUserActiveCart(w http.ResponseWriter, r *http.Request, ps httprouter
 	cart.ID = bson.ObjectIdHex(ps.ByName("cart_id"))
 	cart.UserID = bson.ObjectIdHex(r.Header.Get(models.USERID_COOKIE_NAME))
 	if err := cart.AbandonCart(); err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(cart)
+}
+
+func ReActiveUserCart(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var cart models.Cart
+	cart.DB = db.Database
+	cart.DBSession = cart.DB.Session.Copy()
+	defer cart.DBSession.Close()
+
+	cart.ID = bson.ObjectIdHex(ps.ByName("cart_id"))
+	cart.UserID = bson.ObjectIdHex(r.Header.Get(models.USERID_COOKIE_NAME))
+	if err := cart.ReActivateCart(); err != nil {
 		models.WriteNewError(w, err)
 		return
 	}

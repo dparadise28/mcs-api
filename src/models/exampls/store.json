@@ -1,98 +1,116 @@
 {
-	"tax_rate": 4.5,
-	"platform_categories": [
-		"Restaurants",
-		"Some Other Food Category"
-	],
 	"working_hours": {
-		"wednesday": {
-			"open": true,
+		"monday": {
 			"hours": {
 				"to": 1200,
 				"from": 900
-			}
-		},
-		"sunday": {
-			"open": true,
-			"hours": {
-				"to": 1200,
-				"from": 900
-			}
-		},
-		"tursday": {
-			"open": true,
-			"hours": {
-				"to": 1200,
-				"from": 900
-			}
+			},
+			"open": true
 		},
 		"tuesday": {
-			"open": true,
 			"hours": {
 				"to": 1200,
 				"from": 900
-			}
-		},
-		"monday": {
-			"open": true,
-			"hours": {
-				"to": 1200,
-				"from": 900
-			}
+			},
+			"open": true
 		},
 		"friday": {
-			"open": true,
 			"hours": {
 				"to": 1200,
 				"from": 900
-			}
+			},
+			"open": true
+		},
+		"wednesday": {
+			"hours": {
+				"to": 1200,
+				"from": 900
+			},
+			"open": true
+		},
+		"thursday": {
+			"hours": {
+				"to": 1200,
+				"from": 900
+			},
+			"open": true
+		},
+		"sunday": {
+			"hours": {
+				"to": 1200,
+				"from": 900
+			},
+			"open": true
 		},
 		"saturday": {
-			"open": true,
 			"hours": {
 				"to": 1200,
 				"from": 900
-			}
+			},
+			"open": true
 		}
 	},
-	"name": "store name",
-	"store_categories": [
-		"Breakfast",
-		"Lunch",
-		"Appetizers",
-		"Dinner",
-		"Desert",
-		"Beverages"
-	],
 	"image": "https://...",
+	"category_names": ["Breakfast", "Lunch", "Dinner"],
 	"delivery": {
-		"service_offered": true,
-		"delivery_fee": 500,
+		"delivery_distance": 2,
 		"delivery_minimum": 500,
+		"delivery_fee": 500,
 		"minimum_time_to_delivery": 45,
 		"maximum_time_to_delivery": 100,
-		"delivery_distance": 2
+		"service_offered": true
 	},
-	"phone": "(212) - 123 - 4567",
+	"phone": "2121234567",
+	"tax_rate": 4.5,
+	"long_description": "some long description with lots of words describing the store. more words",
+	"categories": [{
+		"products": [{
+			"price_cents": 200,
+			"description": "asdadf",
+			"asset_id": "595965b936e0a2ee8e8d5905",
+			"image": "http://...",
+			"title": "p0"
+		}],
+		"name": "c_0"
+	}],
+	"platform_categories": ["Restaurants", "Some Other Food Category"],
+	"name": "store_name_2asd33333f",
 	"pickup": {
-		"maximum_time_to_pickup": 30,
 		"offered": true,
+		"maximum_time_to_pickup": 30,
 		"minimum_time_to_pickup": 90,
 		"pickup_items": {
-			"min": 1,
-			"max": 100
+			"max": 100,
+			"min": 1
 		}
 	},
 	"short_description": "some short description with words",
-	"long_description": "some long description with lots of words describing the store. more words",
 	"address": {
-		"administrative_area_level_1": "NY",
-		"country": "USA",
-		"location": {
-			"coordinates": [-73.9505241, 40.5863985]
-		},
-		"postal_code": "11235",
+		"street_number": "",
+		"city": "brooklyn",
+		"line1": "7410 ridge blvd",
+		"country": "United States",
 		"route": "",
-		"street_number": ""
+		"longitude": -73.953333,
+		"postal_code": "11235",
+		"administrative_area_level_1": "NY",
+		"latitude": 40.58633333
+	},
+	"business_type": "company",
+	"email": "dparadis28@gmail.com",
+	"legal_entity": {
+		"business_tax_id": "111111111",
+		"legal_business_name": "blah blah",
+		"last_4_ssn": "1111",
+		"personal_id": "111111111"
+		"owner": {
+			"first": "me",
+			"last": "here",
+			"dob": {
+				"day": 1,
+				"month": 1,
+				"year": 1990
+			}
+		}
 	}
 }

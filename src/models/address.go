@@ -9,20 +9,21 @@ import (
 var AddressCollectionName = "addresses"
 
 type Address struct {
-	ID            bson.ObjectId `bson:"_id" json:"address_id"`
-	Name          string        `bson:"name" json:"name"`
-	City          string        `bson:"city" json:"city" validate:"required"`
-	Line1         string        `bson:"line1" json:"line1" validate:"required"`
-	Route         string        `bson:"route" json:"route"`
-	UserID        bson.ObjectId `bson:"user_id" json:"user_id"`
-	Default       bool          `bson:"default" json:"default"`
-	Country       string        `bson:"country" json:"country" validate:"required"`
-	Location      GeoJson       `bson:"location" json:"location"`
-	Latitude      float64       `bson:"latitude" json:"latitude" validate:"required,min=-85.0511501,max=85.001"`
-	Longitude     float64       `bson:"longitude" json:"longitude" validate:"required,min=-180.001,max=180.001"`
-	PostalCode    string        `bson:"postal_code" json:"postal_code" validate:"required"`
-	StreetNumber  string        `bson:"street_number" json:"street_number"`
-	AdminAreaLvl1 string        `bson:"administrative_area_level_1" json:"administrative_area_level_1"`
+	ID               bson.ObjectId `bson:"_id" json:"address_id"`
+	Name             string        `bson:"name" json:"name"`
+	City             string        `bson:"city" json:"city"`
+	Line1            string        `bson:"line1" json:"line1" validate:"required"`
+	Route            string        `bson:"route" json:"route"`
+	UserID           bson.ObjectId `bson:"user_id" json:"user_id"`
+	Default          bool          `bson:"default" json:"default"`
+	Country          string        `bson:"country" json:"country" validate:"required"`
+	Location         GeoJson       `bson:"location" json:"location"`
+	Latitude         float64       `bson:"latitude" json:"latitude" validate:"required,min=-85.0511501,max=85.001"`
+	Longitude        float64       `bson:"longitude" json:"longitude" validate:"required,min=-180.001,max=180.001"`
+	PostalCode       string        `bson:"postal_code" json:"postal_code" validate:"required"`
+	StreetNumber     string        `bson:"street_number" json:"street_number"`
+	AdminAreaLvl1    string        `bson:"administrative_area_level_1" json:"administrative_area_level_1"`
+	FormattedAddress string        `bson:"formatted_address" json:"formatted_address"`
 
 	// helper fields
 	NewDefaultID bson.ObjectId `bson:"-"`

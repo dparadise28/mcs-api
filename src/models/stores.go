@@ -50,6 +50,34 @@ type StorePickup struct {
 	} `bson:"pickup_items" json:"pickup_items,dive"`
 }
 
+type LegalEntity struct {
+	BillingAddress Address `json:"billing_address" bson:"billing_address" validate:"required,dive"`
+	BusinessTaxID  string  `json:"business_tax_id" bson:"-"`
+	BusinessName   string  `json:"legal_business_name" bson:"legal_business_name" validate:"required"`
+	PersonalID     string  `json:"personal_id" bson:"-"`
+	SSNLast4       string  `json:"last_4_ssn" bson:"-" validate:"max=4,min=4"`
+	Owner          struct {
+		First string `validate:"required"`
+		Last  string `validate:"required"`
+		DOB   struct {
+			Day   uint8  `json:"day" validate:"required"`
+			Month uint8  `json:"month" validate:"required"`
+			Year  uint16 `json:"year" validate:"required"`
+		} `validate:"required,dive"`
+	} `validate:"required,dive"`
+}
+
+type StorePaymentDetails struct {
+	StoreID                bson.ObjectId `bson:"store_id,omitempty" json:"store_id"`
+	LegalEntity            LegalEntity   `json:"legal_entity" bson:"legal_entity" validate:"dive"`
+	BusinessType           string        `json:"business_type" bson:"business_type" validate:"required"`
+	StripeAccountID        string        `bson:"stripe_custom_account_id" json:"-"`
+	AcceptedPaymentMethods []string      `bson:"accepted_payment_methods" json:"accepted_payment_methods" validate:"required,min=0"`
+
+	DB        *mgo.Database `bson:"-" json:"-"`
+	DBSession *mgo.Session  `bson:"-" json:"-"`
+}
+
 type Store struct {
 	ID              bson.ObjectId      `bson:"_id,omitempty" json:"store_id"`
 	Name            string             `bson:"name" json:"name"`
@@ -69,27 +97,8 @@ type Store struct {
 	// ensure its length for now to avoid index
 	// bloating untill switching to a more robust
 	// search solution or building one
-	ShortDescription string `bson:"short_desc" json:"short_description" validate:"max=50"`
-
-	BusinessType           string   `json:"business_type" bson:"business_type" validate:"required"`
-	AcceptedPaymentMethods []string `bson:"accepted_payment_methods" json:"accepted_payment_methods" validate:"required,min=0"`
-	StripeAccountID        string   `bson:"stripe_custom_account_id" json:"-"`
-	LegalEntity            struct {
-		BillingAddress Address `json:"billing_address" bson:"billing_address" validate:"required,dive"`
-		BusinessTaxID  string  `json:"business_tax_id" bson:"-"`
-		BusinessName   string  `json:"legal_business_name" bson:"legal_business_name" validate:"required"`
-		PersonalID     string  `json:"personal_id" bson:"-"`
-		SSNLast4       string  `json:"last_4_ssn" bson:"-" validate:"max=4,min=4"`
-		Owner          struct {
-			First string `validate:"required"`
-			Last  string `validate:"required"`
-			DOB   struct {
-				Day   uint8  `json:"day" validate:"required"`
-				Month uint8  `json:"month" validate:"required"`
-				Year  uint16 `json:"year" validate:"required"`
-			} `validate:"required,dive"`
-		} `validate:"required,dive"`
-	} `json:"legal_entity" bson:"legal_entity" validate:"dive"`
+	ShortDescription string              `bson:"short_desc" json:"short_description" validate:"max=50"`
+	PaymentDetails   StorePaymentDetails `bson:"payment_details" json:"payment_details"`
 
 	CategoryNames []string        `bson:"c_names" json:"category_names"`
 	CTree         []StoreCategory `bson:"-" json:"categories" validate:"required,dive"`
@@ -231,8 +240,8 @@ func (s *Store) RetrieveFullStoreByID(id string) (error, bson.M) {
 				"tax_rate":          bson.M{"$first": "$tax_rate"},
 				"distance":          bson.M{"$first": "$distance"},
 				"categories":        bson.M{"$push": "$categories"},
-				"legal_entity":      bson.M{"$first": "$legal_entity"},
 				"working_hours":     bson.M{"$first": "$working_hours"},
+				"payment_details":   bson.M{"$first": "$payment_details"},
 				"long_description":  bson.M{"$first": "$long_desc"},
 				"short_description": bson.M{"$first": "$short_desc"},
 			},
@@ -296,4 +305,33 @@ func (s *Store) UpdateStoreInfo() {
 		"_id": s.ID,
 	}).Apply(change, s)
 	log.Println(info)
+}
+
+func (s *Store) AddStoreCCPaymentMethod() {
+	c := s.DB.C(StoreCollectionName).With(s.DBSession)
+	change := mgo.Change{
+		ReturnNew: true,
+		Upsert:    false,
+		Remove:    false,
+		Update: bson.M{
+			"$set": bson.M{
+				"payment_details": s.PaymentDetails,
+			},
+		},
+	}
+	info, _ := c.Find(bson.M{
+		"_id": s.ID,
+	}).Apply(change, s)
+	log.Println(info)
+}
+
+func (s *Store) CheckPaymentMethods() error {
+	for _, payment_method := range s.PaymentDetails.AcceptedPaymentMethods {
+		if _, ok := CONST_MAP[PAYMENT_METHODS_KEY][payment_method]; !ok {
+			return errors.New(
+				"payment_method values must be in the set of " + strings.Join(PaymentMethods, ", "),
+			)
+		}
+	}
+	return nil
 }

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"time"
@@ -156,13 +157,13 @@ func (cart *Cart) UpdateProductQuantity(id bson.ObjectId, instructions string, q
 	return nil
 }
 
-func (cart *Cart) RetrieveUserActiveCarts(u_id string) ([]Cart, error) {
+func (cart *Cart) RetrieveUserCartsByStatus() ([]Cart, error) {
 	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
 
-	var carts []Cart
+	carts := []Cart{}
 	err := c.Find(bson.M{
-		"user_id":    bson.ObjectIdHex(u_id),
-		"cart_state": CartStates["ACTIVE"],
+		"user_id":    cart.UserID,
+		"cart_state": cart.CartState,
 	}).All(&carts)
 	for cartIndex, _ := range carts {
 		carts[cartIndex].UpdateCartTotals()
@@ -177,4 +178,30 @@ func (cart *Cart) ActiveUserCartCountForStore() (int, error) {
 		"store_id":   cart.StoreID,
 		"cart_state": CartStates["ACTIVE"],
 	}).Count()
+}
+
+func (cart *Cart) ReActivateCart() error {
+	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
+	c.Find(bson.M{
+		"_id":        cart.ID,
+		"user_id":    cart.UserID,
+		"cart_state": CartStates["COMPLETED"],
+	}).One(cart)
+	if len(cart.Products) == 0 {
+		return errors.New(
+			"The cart you have selected is either empty or could not be found",
+		)
+	}
+	if cartCount, countErr := cart.ActiveUserCartCountForStore(); countErr != nil {
+		return countErr
+	} else if cartCount != 0 {
+		return errors.New(
+			"It appears as though you have an active cart for" +
+				" the store associated with the cart attepting" +
+				" to be re-activated. Please drop that cart and" +
+				" try again.")
+	}
+	cart.ID = bson.NewObjectId()
+	cart.CartState = CartStates["ACTIVE"]
+	return c.Insert(cart)
 }

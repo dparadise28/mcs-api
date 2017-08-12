@@ -54,7 +54,7 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	http.Redirect(w, r, "http://mycorner.store:8003/#/login", http.StatusTemporaryRedirect)
 }
 
-func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId string) {
+func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId string, storeName string) {
 	var user models.User
 	session := db.Database.Session.Copy()
 	defer session.Close()
@@ -64,7 +64,12 @@ func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId stri
 		ReturnNew: true,
 		Upsert:    false,
 		Remove:    false,
-		Update:    bson.M{"$set": bson.M{"user_roles.access." + storeId: models.ACCESSROLE_STOREOWNER}},
+		Update: bson.M{
+			"$set": bson.M{
+				"user_roles.access." + storeId:    models.ACCESSROLE_STOREOWNER,
+				"user_roles.store_map." + storeId: storeName,
+			},
+		},
 	}
 	uid := r.Header.Get(models.USERID_COOKIE_NAME)
 	info, _ := c.Find(bson.M{

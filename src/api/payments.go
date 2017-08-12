@@ -18,11 +18,11 @@ import (
 func CreateStoreStripeCustomAccount(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var store models.Store
 	v := new(tools.DefaultValidator)
-	if err := json.NewDecoder(r.Body).Decode(&store); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&store.PaymentDetails); err != nil {
 		models.WriteNewError(w, err)
 		return
 	}
-	if validationErr := v.ValidateIncomingJsonRequest(&store); validationErr.Status != 200 {
+	if validationErr := v.ValidateIncomingJsonRequest(&store.PaymentDetails); validationErr.Status != 200 {
 		models.WriteError(w, &validationErr)
 		return
 	}
@@ -34,19 +34,19 @@ func CreateStoreStripeCustomAccount(w http.ResponseWriter, r *http.Request, ps h
 	json.NewEncoder(w).Encode(resp)
 }
 
-// ::TODO:: this should prob be part of the store struct
+// ::TODO:: this should prob be part of the store.PaymentDetails struct
 func CreateStoreStripeCustomAccountImpl(w http.ResponseWriter, r *http.Request, ps httprouter.Params, store *models.Store) (*stripe.Account, error) {
 	stripe.Key = models.StripeSK
 	act := stripe.Account{}
 	BusinessType := stripe.Company
-	if store.BusinessType == "individual" {
+	if store.PaymentDetails.BusinessType == "individual" {
 		BusinessType = stripe.Individual
-	} else if store.BusinessType != "company" {
+	} else if store.PaymentDetails.BusinessType != "company" {
 		return &act, errors.New("Invalid option provided for business_type. Field must either individual or company")
 	}
 	params := &stripe.AccountParams{
 		Type:    stripe.AccountTypeCustom,
-		Country: models.CountryNameToCountryCode[store.LegalEntity.BillingAddress.Country],
+		Country: models.CountryNameToCountryCode[store.PaymentDetails.LegalEntity.BillingAddress.Country],
 		TOSAcceptance: &stripe.TOSAcceptanceParams{
 			IP:        strings.Split(r.RemoteAddr, ":")[0],
 			Date:      time.Now().Unix(),
@@ -54,29 +54,29 @@ func CreateStoreStripeCustomAccountImpl(w http.ResponseWriter, r *http.Request, 
 		},
 		LegalEntity: &stripe.LegalEntity{
 			PersonalIDProvided: true,
-			BusinessTaxID:      store.LegalEntity.BusinessTaxID,
-			BusinessName:       store.LegalEntity.BusinessName,
-			PersonalID:         store.LegalEntity.PersonalID,
-			First:              store.LegalEntity.Owner.First,
-			Last:               store.LegalEntity.Owner.Last,
+			BusinessTaxID:      store.PaymentDetails.LegalEntity.BusinessTaxID,
+			BusinessName:       store.PaymentDetails.LegalEntity.BusinessName,
+			PersonalID:         store.PaymentDetails.LegalEntity.PersonalID,
+			First:              store.PaymentDetails.LegalEntity.Owner.First,
+			Last:               store.PaymentDetails.LegalEntity.Owner.Last,
 			Type:               BusinessType,
-			SSN:                store.LegalEntity.SSNLast4,
+			SSN:                store.PaymentDetails.LegalEntity.SSNLast4,
 			DOB: stripe.DOB{
-				Day:   int(store.LegalEntity.Owner.DOB.Day),
-				Month: int(store.LegalEntity.Owner.DOB.Month),
-				Year:  int(store.LegalEntity.Owner.DOB.Year),
+				Day:   int(store.PaymentDetails.LegalEntity.Owner.DOB.Day),
+				Month: int(store.PaymentDetails.LegalEntity.Owner.DOB.Month),
+				Year:  int(store.PaymentDetails.LegalEntity.Owner.DOB.Year),
 			},
 			Address: stripe.Address{
-				Country: models.CountryNameToCountryCode[store.LegalEntity.BillingAddress.Country],
-				City:    store.LegalEntity.BillingAddress.City,
-				Zip:     store.LegalEntity.BillingAddress.PostalCode,
-				Line1:   store.LegalEntity.BillingAddress.Line1,
-				State:   store.LegalEntity.BillingAddress.AdminAreaLvl1,
+				Country: models.CountryNameToCountryCode[store.PaymentDetails.LegalEntity.BillingAddress.Country],
+				City:    store.PaymentDetails.LegalEntity.BillingAddress.City,
+				Zip:     store.PaymentDetails.LegalEntity.BillingAddress.PostalCode,
+				Line1:   store.PaymentDetails.LegalEntity.BillingAddress.Line1,
+				State:   store.PaymentDetails.LegalEntity.BillingAddress.AdminAreaLvl1,
 			},
 		},
 		ExternalAccount: &stripe.AccountExternalAccountParams{
 			Token:    r.URL.Query().Get("stripe_src"),
-			Country:  models.CountryNameToCountryCode[store.LegalEntity.BillingAddress.Country],
+			Country:  models.CountryNameToCountryCode[store.PaymentDetails.LegalEntity.BillingAddress.Country],
 			Currency: "usd",
 		},
 	}
@@ -88,9 +88,10 @@ func CreateStoreStripeCustomAccountImpl(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
-/*func CreateCustomerStripeReuseableAccount(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	//var store models.Stripe
-	stripe_email = r.URL.Query().Get("store_email")
+/*
+func CreateCustomerStripeReuseableAccount(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	//var store.PaymentDetails models.Stripe
+	stripe_email = r.URL.Query().Get("store.PaymentDetails_email")
 	stripe_src = r.URL.Query().Get("stripe_src")
 	stripe.Key = models.StripeSK
 

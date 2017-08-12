@@ -683,7 +683,22 @@ var APIRouteList = []map[string]map[string]interface{}{
 			"api_method": api.RetrieveUserActiveCarts,
 			"description": []string{
 				"Retrieve all active carts for the user identified by the id in",
-				"the url structure associated with the call.",
+				"the headers.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/carts/retrieve/completed": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.RetrieveUserCompletedCarts,
+			"description": []string{
+				"Retrieve all completed carts for the user identified by the id in",
+				"the headers.",
 			},
 		},
 	},
@@ -702,6 +717,28 @@ var APIRouteList = []map[string]map[string]interface{}{
 				"update their state to reflect the user is no longer interested",
 				"in their cart in its current state. We do this for future",
 				"analytics inferences we may want to make from user interations.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/cart/re-activate/:cart_id": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.ReActiveUserCart,
+			"description": []string{
+				"This will basically duplicate a previously checked out cart.",
+				"If you currently have an active cart associated with the same",
+				"store as the cart about to be re-activated this call will error",
+				"out with the approriate error message telling you you must",
+				"drop that active cart first. If try to re activate a cart with",
+				"any other state then completed then this call will not work for",
+				"that either. The carts safe to reactivate (with the exception of",
+				"of potentially already having an active cart) can be retrieved",
+				"from the /carts/retrieve/completed api.",
 			},
 		},
 	},
