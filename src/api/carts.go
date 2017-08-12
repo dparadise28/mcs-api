@@ -49,6 +49,7 @@ func UpdateCartProductQuantity(w http.ResponseWriter, r *http.Request, ps httpro
 		}
 		cart.StoreTaxRate = s.TaxRate
 		cart.DeliveryFee = s.Delivery.Fee
+		cart.StoreName = s.Name
 		cart.IsNew = true
 	} else if count_err != nil {
 		models.WriteNewError(w, count_err)
