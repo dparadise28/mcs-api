@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"gopkg.in/gomail.v2"
+	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"log"
 	"models"
@@ -41,36 +42,28 @@ func SendEmail(email *models.Email) {
 		log.Println(err)
 		log.Printf("email could not be sent")
 	}
-	//time.Sleep(time.Second * 4)
 	log.Println("email sent")
 }
 
 func emailDaemon() {
 	for email := range EmailQueue {
 		mail, _ := json.Marshal(email)
-		path := queuePaths[0] + time.Now().String()
-		//fileMutex.Lock()
+		path := queuePaths[0] + bson.NewObjectId().Hex() + "__" + time.Now().String()
 		f, err := os.Create(path)
-		//log.Println("starting")
 		if err != nil {
 			log.Println(err)
-			//fileMutex.Unlock()
 			return
 		}
 		if _, err := f.Write(mail); err != nil {
 			f.Close()
 			log.Println(err)
-			//fileMutex.Unlock()
 			return
 		}
 		f.Close()
-		//log.Println("closed file")
-		//fileMutex.Unlock()
 		go func() {
 			log.Println("logging")
 			Emailch <- &path
 		}()
-		//SendEmail(email)
 	}
 }
 

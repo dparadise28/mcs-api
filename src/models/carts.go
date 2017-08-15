@@ -72,6 +72,7 @@ func (cart *Cart) UpdateProductQuantityQueries(p CartProduct) []bson.M {
 				},
 			},
 			"$set": bson.M{
+				"store_name":   cart.StoreName,
 				"last_updated": cart.LastUpdated,
 				"delivery_fee": cart.DeliveryFee,
 				"tax_rate":     cart.StoreTaxRate,

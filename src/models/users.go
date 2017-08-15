@@ -3,6 +3,7 @@ package models
 import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"log"
 )
 
 var UserCollectionName = "Users"
@@ -10,46 +11,64 @@ var UserCollectionName = "Users"
 type User struct {
 	ID               bson.ObjectId     `bson:"_id,omitempty" json:"user_id"`
 	ConfirmationCode string            `bson:"confirmation_code" json:"confirmation_code"`
-	AddressBook      []Address         `bson:"address_book" json:"address_book"`
-	DefaultAddr      bson.ObjectId     `bson:"default_address" json:"default_address"`
+	IsStoreOwner     bool              `bson:"is_store_owner" json:"is_store_owner"`
 	Confirmed        bool              `bson:"confirmed" json:"confirmed"`
 	Password         string            `bson:"password" json:"password" validate:"required"`
+	Phone            string            `bson:"phone" json:"phone"` // validate:"required"`
 	Email            string            `bson:"email" json:"email" validate:"required,email"`
 	Roles            UserRoles         `bson:"user_roles" json:"user_roles"`
 	Stores           map[string]string `bson:"store_map" json:"store_map"`
+	StripeCustomerID string            `bson:"stripe_customer_id" json:"stripe_customer_id"`
 	// user roles struct is in /src/models/auth
 
 	Login struct {
 		Token string        `bson:"-" json:"authtoken"`
 		UID   bson.ObjectId `bson:"-" json:"userID"`
 	} `bson:"-" json:"login"`
+
+	// helper fields
+	DB          *mgo.Database `bson:"-" json:"-"`
+	DBSession   *mgo.Session  `bson:"-" json:"-"`
+	StripeToken string        `bson:"-" json:"-"`
 }
 
 type UserAPIResponse struct {
-	ID bson.ObjectId `bson:"_id,omitempty" json:"user_id"`
-	//AddressBook []UserAddress `bson:"address_book" json:"address_book"`
-	Confirmed bool      `bson:"confirmed" json:"confirmed"`
-	Email     string    `bson:"email" json:"email" validate:"required,email"`
-	Roles     UserRoles `bson:"user_roles" json:"user_roles"`
+	ID           bson.ObjectId `bson:"_id,omitempty" json:"user_id"`
+	IsStoreOwner bool          `bson:"is_store_owner" json:"is_store_owner" validate:"required"`
+	Confirmed    bool          `bson:"confirmed" json:"confirmed"`
+	Email        string        `bson:"email" json:"email" validate:"required,email"`
+	Roles        UserRoles     `bson:"user_roles" json:"user_roles"`
 }
 
-func (a *Address) AddAddressToUserAddressBook(u_id bson.ObjectId) error {
-	c := a.DB.C(UserCollectionName).With(a.DBSession)
-	a.Location.Coordinates = []float64{a.Latitude, a.Latitude}
-	pushQuery := bson.M{
-		"$push": bson.M{
-			"address_book": a,
+/*
+func (u *User) DoesUserHaveAStripAccount() bool {
+	c := u.DB.C(UserCollectionName).With(u.DBSession)
+	if count == 1; count := c.Find(bson.M{
+		"_id": u.ID,
+		"stripe_customer_id": bson.M{
+			"$exists": true,
 		},
-	}
+	}).Count() {}
+	return err
+}
+*/
+func (u *User) AddUserStripeCustomerAccount() error {
+	c := u.DB.C(UserCollectionName).With(u.DBSession)
+	log.Println(u.StripeCustomerID)
 	change := mgo.Change{
 		ReturnNew: true,
 		Upsert:    false,
 		Remove:    false,
-		Update:    pushQuery,
+		Update: bson.M{
+			"$set": bson.M{
+				"stripe_customer_id": u.StripeCustomerID,
+			},
+		},
 	}
+	log.Println(u.StripeCustomerID)
 	_, err := c.Find(bson.M{
-		"_id": u_id,
-	}).Apply(change, a)
+		"_id": u.ID,
+	}).Apply(change, u)
 	return err
 }
 

@@ -1,7 +1,7 @@
 package networking
 
 import (
-	"github.com/dgrijalva/jwt-go"
+	//"github.com/dgrijalva/jwt-go"
 	hr "github.com/julienschmidt/httprouter"
 	"github.com/rs/cors"
 	"log"
@@ -32,15 +32,9 @@ func ValidatedToken(w http.ResponseWriter, r *http.Request, ps hr.Params, ep str
 	tokenStr := r.Header.Get(models.JWT_COOKIE_NAME)
 	uid := r.Header.Get(models.USERID_COOKIE_NAME)
 	if tokenStr == "" || uid == "" {
-		log.Println("Missing Token")
 		return false, models.ErrUnauthorizedAccess
 	}
-	log.Println(tokenStr)
-	token, err := jwt.ParseWithClaims(tokenStr, &models.CustomClaims{},
-		func(token *jwt.Token) (interface{}, error) {
-			return []byte(models.JWT_SIGNATURE), nil
-		},
-	)
+	token, err := models.GetJWTContent(tokenStr)
 
 	if err == nil {
 		if claims, ok := token.Claims.(*models.CustomClaims); ok && token.Valid {
@@ -68,7 +62,7 @@ func ValidatedToken(w http.ResponseWriter, r *http.Request, ps hr.Params, ep str
 				}
 			}
 			// checks pass so lets update the token with the new expiration time
-			updatedClaims := models.GenerateTokenClaims(claims.Perms, claims.Confirmed)
+			updatedClaims := models.GenerateTokenClaims(claims.Perms, claims.Confirmed, claims.StripeCustomerID)
 			updatedToken, _ := updatedClaims.CreateToken()
 			w.Header().Set(models.JWT_COOKIE_NAME, updatedToken)
 			return true, models.ErrSuccess

@@ -136,7 +136,8 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	defer session.Close()
 	c := db.Database.C(models.UserCollectionName).With(session)
 	if insert_err := c.Insert(&user); insert_err != nil {
-		models.WriteError(w, models.ErrResourceConflict)
+		models.WriteNewError(w, insert_err) //models.ErrResourceConflict)
+		log.Println(user)
 		return
 	}
 

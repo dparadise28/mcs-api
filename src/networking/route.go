@@ -303,6 +303,65 @@ var APIRouteList = []map[string]map[string]interface{}{
 			},
 		},
 	},
+	map[string]map[string]interface{}{
+		"/user/wallet/add": {
+			"control_method": "GET",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.CreateCustomerStripeReuseableAccount,
+			"description": []string{
+				"This is an interface to add a cc associated with the token in url query params",
+				"(stripe_src=tok_str). If there is no stripe customer account associated with the",
+				"user id in the request headers then one will automatically be created with the",
+				"card provided in the url. If the user has already activated their waller then",
+				"the card will be added to it. The stripe customer account id is then set in the",
+				"jwt token for later user. You must either grab the token from the headers, response",
+				"body, or re-login in order to proceed with actions to your wallet.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/user/wallet/retrieve": {
+			"control_method": "GET",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.GetUserStipeCustomerAccount,
+			"description": []string{
+				"Simply retrieves a users wallet if one exists for the user making the request",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/user/wallet/change/default": {
+			"control_method": "GET",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.SetUserDefaultStipeCC,
+			"description": []string{
+				"Change the default cc in your wallet by adding new_default_cc=card_id in the",
+				"query params.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/user/wallet/remove": {
+			"control_method": "GET",
+			"authenticate": []string{
+				models.ACCESSROLE_CONFIRMED_USER,
+			},
+			"max_rps":    nil,
+			"api_method": api.DeleteUserStipeCC,
+			"description": []string{
+				"Remove a cc from your wallet by adding card_id=card_id in the query params.",
+			},
+		},
+	},
 
 	// stores api
 	map[string]map[string]interface{}{

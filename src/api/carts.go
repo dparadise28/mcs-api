@@ -65,7 +65,8 @@ func UpdateCartProductQuantity(w http.ResponseWriter, r *http.Request, ps httpro
 		models.WriteError(w, models.ErrBadRequest)
 		return
 	}
-	json.NewEncoder(w).Encode(cart)
+	RetrieveUserActiveCarts(w, r, ps)
+	//json.NewEncoder(w).Encode(cart)
 }
 
 func RetrieveUserActiveCarts(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {

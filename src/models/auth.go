@@ -45,15 +45,17 @@ type UserRoles struct {
 }
 
 type CustomClaims struct {
-	Perms     map[string]string
-	Confirmed bool
+	Perms            map[string]string
+	Confirmed        bool
+	StripeCustomerID string
 	jwt.StandardClaims
 }
 
-func GenerateTokenClaims(access map[string]string, confirmed bool) CustomClaims {
+func GenerateTokenClaims(access map[string]string, confirmed bool, stripeID string) CustomClaims {
 	return CustomClaims{
-		Perms:     access,
-		Confirmed: confirmed,
+		Perms:            access,
+		Confirmed:        confirmed,
+		StripeCustomerID: stripeID,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: JWT_TTL(),
 			Issuer:    JWT_ISSUER,
@@ -71,38 +73,47 @@ func (c *CustomClaims) CreateToken() (string, error) {
 	return tokenString, tokenErr
 }
 
-func (ur *User) GenetateLoginToken(pw string) (string, error) {
-	if !ur.Confirmed {
+func (u *User) GenetateLoginToken(pw string) (string, error) {
+	if !u.Confirmed {
 		return "", errors.New(UNCONFIRMED_USER)
 	}
-	err := bcrypt.CompareHashAndPassword([]byte(ur.Password), []byte(pw))
+	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(pw))
 	if pw == "" || err != nil {
 		return "", errors.New("Unauthorized access")
 	}
 
-	token, err := ur.UpdateToken()
+	token, err := u.UpdateToken()
 	return token, err
 }
 
-func (ur *User) GenetateLoginTokenAndSetHeaders(pw string, w http.ResponseWriter) (string, error) {
-	if !ur.Confirmed {
+func GetJWTContent(tokenStr string) (*jwt.Token, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &CustomClaims{},
+		func(token *jwt.Token) (interface{}, error) {
+			return []byte(JWT_SIGNATURE), nil
+		},
+	)
+	return token, err
+}
+
+func (u *User) GenetateLoginTokenAndSetHeaders(pw string, w http.ResponseWriter) (string, error) {
+	if !u.Confirmed {
 		return "", errors.New(UNCONFIRMED_USER)
 	}
-	err := bcrypt.CompareHashAndPassword([]byte(ur.Password), []byte(pw))
+	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(pw))
 	if pw == "" || err != nil {
 		return "", errors.New("Unauthorized access")
 	}
 
-	token, err := ur.UpdateTokenAndCookie(w)
+	token, err := u.UpdateTokenAndCookie(w)
 	return token, err
 }
 
-func (ur *User) UpdateToken() (string, error) {
-	claims := GenerateTokenClaims(ur.Roles.Access, ur.Confirmed)
+func (u *User) UpdateToken() (string, error) {
+	claims := GenerateTokenClaims(u.Roles.Access, u.Confirmed, u.StripeCustomerID)
 	token, err := claims.CreateToken()
 
-	ur.Login.Token = token
-	ur.Login.UID = ur.ID
+	u.Login.Token = token
+	u.Login.UID = u.ID
 	return token, err
 }
 
