@@ -4,6 +4,7 @@ import (
 	"errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"strconv"
 	"time"
 )
 
@@ -129,12 +130,84 @@ func (cart *Cart) AbandonCart() error {
 	return nil
 }
 
+func (cart *Cart) CompleteCart() error {
+	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
+	change := mgo.Change{
+		ReturnNew: true,
+		Upsert:    false,
+		Remove:    false,
+		Update: bson.M{
+			"$set": bson.M{
+				"last_updated": time.Now(),
+				"cart_state":   CartStates["COMPLETED"],
+			},
+		},
+	}
+	_, err := c.Find(bson.M{
+		"_id":        cart.ID,
+		"user_id":    cart.UserID,
+		"cart_state": CartStates["ACTIVE"],
+	}).Apply(change, cart)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (cart *Cart) UpdateCartTotals() {
 	for _, product := range cart.Products {
 		cart.Totals.Subtotal += product.PriceCents * uint32(product.Quantity)
 	}
 	cart.Totals.Tax = float64(cart.Totals.Subtotal) * cart.StoreTaxRate / 100.00
 	cart.Totals.Total = cart.Totals.Tax + float64(cart.Totals.Subtotal) + float64(cart.DeliveryFee)
+}
+
+func FormatPriceCents(n int64) string {
+	in := strconv.FormatInt(n, 10)
+	neg := false
+	out := make([]byte, len(in)+(len(in)-2+int(in[0]/'0'))/3)
+	if in[0] == '-' {
+		in, neg = in[1:], true
+	}
+	if len(in) == 1 {
+		return "$" + string(out) + "0.0" + in
+	}
+	if len(in) == 2 {
+		return "$" + string(out) + "0." + in
+	}
+	cents := in[len(in)-2:]
+	in = in[:len(in)-2]
+	for i, j, k := len(in)-1, len(out)-1, 0; ; i, j = i-1, j-1 {
+		out[j] = in[i]
+		if i == 0 {
+			break
+		}
+		if k++; k == 3 {
+			j, k = j-1, 0
+			out[j] = ','
+		}
+	}
+	if neg {
+		return "-$" + string(out) + "." + cents
+	} else {
+		return "$" + string(out) + "." + cents
+	}
+}
+
+func (cart *Cart) GetCartProductsOrderMarkup() string {
+	markup := ""
+	for _, p := range cart.Products {
+		markup += `<br><br>
+			<div class="column-left">
+				<b>` + strconv.Itoa(int(p.Quantity)) + ` </b> x
+			</div>
+			<div class="column-center">` + p.ProductTitle +
+			`</div>
+			<div class="column-right">
+				<b>` + FormatPriceCents(int64(p.PriceCents)) + `</b>
+			</div>`
+	}
+	return markup
 }
 
 func (cart *Cart) UpdateProductQuantity(id bson.ObjectId, instructions string, quantity uint16) error {
@@ -170,6 +243,18 @@ func (cart *Cart) RetrieveUserCartsByStatus() ([]Cart, error) {
 		carts[cartIndex].UpdateCartTotals()
 	}
 	return carts, err
+}
+
+func (cart *Cart) GetCartsById() error {
+	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
+
+	if err := c.Find(bson.M{
+		"_id": cart.ID,
+	}).One(cart); err != nil {
+		return err
+	}
+	cart.UpdateCartTotals()
+	return nil
 }
 
 func (cart *Cart) ActiveUserCartCountForStore() (int, error) {

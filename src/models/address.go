@@ -4,6 +4,7 @@ import (
 	"errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"math"
 )
 
 var AddressCollectionName = "addresses"
@@ -12,13 +13,15 @@ type Address struct {
 	ID               bson.ObjectId `bson:"_id" json:"address_id"`
 	Name             string        `bson:"name" json:"name"`
 	City             string        `bson:"city" json:"city"`
+	Phone            string        `bson:"phone" json:"phone"`
 	Line1            string        `bson:"line1" json:"line1" validate:"required"`
 	Route            string        `bson:"route" json:"route"`
 	UserID           bson.ObjectId `bson:"user_id" json:"user_id"`
 	Default          bool          `bson:"default" json:"default"`
 	Country          string        `bson:"country" json:"country" validate:"required"`
 	Location         GeoJson       `bson:"location" json:"location"`
-	Latitude         float64       `bson:"latitude" json:"latitude" validate:"required,min=-85.0511501,max=85.001"`
+	AptSuite         GeoJson       `bson:"apt_suite" json:"apt_suite"`
+	Latitude         float64       `bson:"latitude" json:"latitude" validate:"required,min=-85.0511499,max=85.001"`
 	Longitude        float64       `bson:"longitude" json:"longitude" validate:"required,min=-180.001,max=180.001"`
 	PostalCode       string        `bson:"postal_code" json:"postal_code" validate:"required"`
 	StreetNumber     string        `bson:"street_number" json:"street_number"`
@@ -128,4 +131,32 @@ func (a *Address) RetrieveUserAddressBook() ([]Address, error) {
 		"user_id": a.UserID,
 	}).All(&addrs)
 	return addrs, err
+}
+
+func (a *Address) GetAddressById() error {
+	c := a.DB.C(AddressCollectionName).With(a.DBSession)
+	return c.Find(bson.M{
+		"_id": a.ID,
+	}).One(&a)
+}
+
+func hsin(theta float64) float64 {
+	return math.Pow(math.Sin(theta/2), 2)
+}
+
+func Distance(lat1, lon1, lat2, lon2 float64) float64 {
+	// convert to radians
+	// must cast radius as float to multiply later
+	var la1, lo1, la2, lo2, r float64
+	la1 = lat1 * math.Pi / 180
+	lo1 = lon1 * math.Pi / 180
+	la2 = lat2 * math.Pi / 180
+	lo2 = lon2 * math.Pi / 180
+
+	r = 3961 // Earth radius in METERS
+
+	// calculate
+	h := hsin(la2-la1) + math.Cos(la1)*math.Cos(la2)*hsin(lo2-lo1)
+
+	return 2 * r * math.Asin(math.Sqrt(h))
 }

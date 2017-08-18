@@ -90,7 +90,7 @@ type Store struct {
 	TaxRate         float64            `bson:"tax_rate" json:"tax_rate" validate:"required"`
 	Enabled         bool               `bson:"enabled" json:"enabled"`
 	Delivery        StoreDelivery      `json:"delivery" validate:"dive"`
-	Distance        float64            `bson:"distance,omitempty" json:"distance,omitempty"`
+	Distance        float64            `bson:"distance,omitempty" json:"distance"`
 	WorkingHours    WeeklyWorkingHours `bson:"working_hours" json:"working_hours" validate:"required,dive"`
 	LongDescription string             `bson:"long_desc" json:"long_description" validate:"max=200"`
 	// this field has has a fulltext index for
@@ -99,7 +99,9 @@ type Store struct {
 	// bloating untill switching to a more robust
 	// search solution or building one
 	ShortDescription string              `bson:"short_desc" json:"short_description" validate:"max=50"`
-	PaymentDetails   StorePaymentDetails `bson:"payment_details" json:"payment_details"`
+	PaymentDetails   StorePaymentDetails `bson:"payment_details" json:"payment_details" validate:"-"`
+	ReviewScore      int64               `bson:"review_score" json:"review_score"`
+	ReviewCount      int64               `bson:"review_count" json:"review_count"`
 
 	CategoryNames []string        `bson:"c_names" json:"category_names"`
 	CTree         []StoreCategory `bson:"-" json:"categories" validate:"required,dive"`
@@ -113,7 +115,7 @@ type Store struct {
 func (s *Store) PrepStoreEntitiesForInsert() error {
 	s.PaymentDetails.AcceptsCCPayment = false
 	s.PaymentDetails.AcceptsCashPayment = true
-	s.Enabled = true
+	s.Enabled = false
 
 	s.ID = bson.NewObjectId()
 	s.CategoryNames = []string{}
@@ -195,7 +197,15 @@ func (s *Store) RetrieveStoreByID(id string) error {
 	}
 	c := s.DB.C(StoreCollectionName).With(s.DBSession)
 	err := c.Find(query).One(s)
-	log.Println(err)
+	return err
+}
+
+func (s *Store) RetrieveStoreByOID() error {
+	query := bson.M{
+		"_id": store.ID,
+	}
+	c := s.DB.C(StoreCollectionName).With(s.DBSession)
+	err := c.Find(query).One(s)
 	return err
 }
 
@@ -265,7 +275,7 @@ func (s *Store) RetrieveFullStoreByID(id string) (error, bson.M) {
 	return err, resp[0]
 }
 
-func (s *Store) FindStoresByLocation(long float64, lat float64, maxDist float64, time int) (error, []bson.M) {
+func (s *Store) FindStoresByLocation(long float64, lat float64, maxDist float64, time int) (error, []Store) {
 	query := bson.M{
 		"address.location": bson.M{
 			"$near": bson.M{
@@ -278,8 +288,15 @@ func (s *Store) FindStoresByLocation(long float64, lat float64, maxDist float64,
 		},
 	}
 	c := s.DB.C(StoreCollectionName).With(s.DBSession)
-	stores := []bson.M{}
+	stores := []Store{}
 	err := c.Find(query).All(&stores)
+	for index, store := range stores {
+		stores[index].Distance = Distance(
+			store.Address.Latitude,
+			store.Address.Longitude,
+			lat, long,
+		)
+	}
 	return err, stores
 }
 

@@ -130,3 +130,11 @@ func (u *UserAPIResponse) GetByIdStr(db *mgo.Database, id string) {
 	c := db.C(UserCollectionName).With(session)
 	c.Find(bson.M{"_id": bson.ObjectIdHex(id)}).One(u)
 }
+
+func (u *User) GetById() error {
+	c := u.DB.C(UserCollectionName).With(u.DBSession)
+	err := c.Find(bson.M{
+		"_id": u.ID,
+	}).One(u)
+	return err
+}

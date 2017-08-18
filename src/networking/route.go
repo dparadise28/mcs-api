@@ -891,6 +891,66 @@ var APIRouteList = []map[string]map[string]interface{}{
 		},
 	},
 
+	// reviews
+	map[string]map[string]interface{}{
+		"/review/order/add": {
+			"control_method": "POST",
+			"post_payload":   models.Review{},
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.ReviewOrder,
+			"description": []string{
+				"This call follows the same convention as the store review but also",
+				"requires an order_id.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/review/store/add": {
+			"control_method": "POST",
+			"post_payload":   models.Review{},
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.ReviewStore,
+			"description": []string{
+				"This call is exposed to review a store. It is pretty interactive",
+				"and should display valid interactive errors. The required fields",
+				"for this call are score, and store_id. The other fields will be",
+				"filled out automatically for this call, with the exception of the",
+				"optional field, comment, which you can specify any time. The max",
+				"field length allowed for the comment is 200 characters.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/review/platform/add": {
+			"control_method": "POST",
+			"post_payload":   models.Review{},
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.ReviewPlatform,
+			"description": []string{
+				"This follows the same convention as adding a store review but",
+				"without the restriction of requiring a store id and there is no",
+				"api exposed to retrieve these reviews. We can expose this when",
+				"we have a platform admin ui to view these.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/review/store/retrieve": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.GetStoreReviews,
+			"description": []string{
+				"Api to expose all reviews currently made by customers of the store",
+				"specified in the query params (url?store_id=store_id)",
+			},
+		},
+	},
+
 	map[string]map[string]interface{}{
 		"/transform": {
 			"control_method": "GET",

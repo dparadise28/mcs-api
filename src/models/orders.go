@@ -1,6 +1,8 @@
 package models
 
 import (
+	"errors"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"time"
 )
@@ -19,13 +21,19 @@ const (
 	ALL_STATUSES_KEY      = "status"
 	DELIVERY_STATUSES_KEY = "delivery_status"
 	PICKUP_STATUSES_KEY   = "pickup_status"
-	CANCELED              = "CANCELED"
-	IN_PROGRESS           = "IN-PROGRESS"
-	COMPLETED             = "COMPLETED"
-	REJECTED              = "REJECTED"
-	EN_ROUTE              = "EN-ROUTE"
-	APPROVED              = "APPROVED"
-	PENDING               = "PENDING"
+
+	PENDING     = "PENDING"
+	APPROVED    = "APPROVED"
+	REJECTED    = "REJECTED"
+	IN_PROGRESS = "IN-PROGRESS"
+	CANCELED    = "CANCELED"
+	EN_ROUTE    = "EN-ROUTE"
+	COMPLETED   = "COMPLETED"
+
+	FAILED_PAYMENT_HOLD    = "FAILED-PAYMENT-HOLD"
+	PAYMENT_ON_HOLD        = "PAYMENT-ON-HOLD"
+	FAILED_PAYMENT_CAPTURE = "FAILED-PAYMENT-CAPTURE"
+	PAYMENT_CAPTURED       = "PAYMENT-CAPTURED"
 )
 
 var (
@@ -91,22 +99,106 @@ var (
 	}
 )
 
+type CashPickupOrderRequest struct {
+	CartID           bson.ObjectId `bson:"cart_id" json:"id" validate:"required"`
+	StoreID          bson.ObjectId `bson:"store_id" json:"store_id" validate:"required"`
+	UserInstructions string        `bson:"instructions" json:"instructions"`
+}
+
+type CashDeliveryOrderRequest struct {
+	CartID           bson.ObjectId `bson:"cart_id" json:"id" validate:"required"`
+	StoreID          bson.ObjectId `bson:"store_id" json:"store_id" validate:"required"`
+	AddressID        bson.ObjectId `bson:"address_id" json:"address_id" validate:"required"`
+	UserInstructions string        `bson:"instructions" json:"instructions"`
+}
+
+type CCPickupOrderRequest struct {
+	Tip              uint          `bson:"tip" json:"tip"`
+	CardID           bson.ObjectId `bson:"card_id" json:"card_id"`
+	CartID           bson.ObjectId `bson:"cart_id" json:"id" validate:"required"`
+	StoreID          bson.ObjectId `bson:"store_id" json:"store_id" validate:"required"`
+	UserInstructions string        `bson:"instructions" json:"instructions"`
+}
+
+type CCDeliveryOrderRequest struct {
+	Tip              uint          `bson:"tip" json:"tip"`
+	CardID           bson.ObjectId `bson:"card_id" json:"card_id"`
+	CartID           bson.ObjectId `bson:"cart_id" json:"id" validate:"required"`
+	StoreID          bson.ObjectId `bson:"store_id" json:"store_id" validate:"required"`
+	AddressID        bson.ObjectId `bson:"address_id" json:"address_id" validate:"required"`
+	UserInstructions string        `bson:"instructions" json:"instructions"`
+}
+
+type OrderPayment struct {
+	ChargeStatus string `bson:"charge_status" json:"charge_status"`
+	ErrorMessage string `bson:"error_message" json:"error_message"`
+}
+
 type Order struct {
-	// ::TODO:: update model with payment info when integrating stripe
 	ID                 bson.ObjectId `bson:"_id" json:"id"`
+	Tip                uint          `bson:"tip" json:"tip"`
+	CardID             bson.ObjectId `bson:"card_id" json:"card_id"`
 	UserID             bson.ObjectId `bson:"user_id" json:"user_id"`
 	CartID             bson.ObjectId `bson:"cart_id" json:"id"`
 	StoreID            bson.ObjectId `bson:"store_id" json:"store_id"`
-	StoreName          string        `bson:"store_name" json:"store_name"`
-	OrderType          uint8         `bson:"order_type" json:"order_type"`
-	OrderStatus        uint8         `bson:"order_status" json:"order_status"`
-	DateCreated        time.Time     `bson:"created_at" json:"created_at"`
-	ProductNames       []string      `bson:"product_names" json:"product_names"`
-	DateFulfilled      time.Time     `bson:"fulfilled_at" json:"fulfilled_at"`
-	PaymentMethod      uint8         `bson:"payment_method" json:"payment_method"`
+	ChargeID           bson.ObjectId `bson:"charge_id" json:"charge_id"`
+	AddressID          bson.ObjectId `bson:"address_id" json:"address_id"`
+	OrderType          string        `bson:"order_type" json:"order_type"`
+	OrderStatus        string        `bson:"order_status" json:"order_status"`
+	PaymentMethod      string        `bson:"payment_method" json:"payment_method"`
 	UserInstructions   string        `bson:"instructions" json:"instructions"`
-	StoreMessageToUser string        `bson:"store_msg2user" json:"store_message_to_user"`
+	StoreMessageToUser string        `bson:"store_msg_to_user" json:"store_message_to_user"`
+	Times              struct {
+		LastUpdatedAt time.Time `bson:"last_updated_at" json:"last_updated_at"`
+		CompletedAt   time.Time `bson:"completed_at" json:"completed_at"`
+		CreatedAt     time.Time `bson:"fulfilled_at" json:"fulfilled_at"`
+	} `bson:"times" json:"times"`
 
-	// index of address in users address book (in the user model now)
-	DeliveryAddressIndex uint8 `bson:"address_index" json:"delivery_address_index"`
+	// helpers
+	Address Address `bson:"-" json:"-"`
+	Store   Store   `bson:"-" json:"-"`
+	Cart    Cart    `bson:"-" json:"-"`
+	User    User    `bson:"-" json:"-"`
+
+	DB        *mgo.Database `bson:"-" json:"-"`
+	DBSession *mgo.Session  `bson:"-" json:"-"`
+}
+
+func (o *Order) ExpandOrderInfo() error {
+	o.User.ID, o.Store.ID, o.Cart.ID = o.UserID, o.StoreID, o.CartID
+	o.User.DB = o.DB
+	o.User.DBSession = o.DBSession
+	if err := o.User.GetById(); err != nil {
+		return err
+	}
+	if o.User.StripeCustomerID == "" && o.CardID == "" && o.PaymentMethod != CC {
+		errors.New("Please add a cc to your wallet")
+	}
+
+	o.store.DB = o.db
+	o.store.DBSession = o.DBSession
+	if err := o.Store.RetrieveStoreByOID(); err != nil {
+		return err
+	}
+
+	o.Cart.DB = o.DB
+	o.Cart.DBSession = o.DBSession
+	if err := o.Cart.GetCartsById(); err != nil {
+		return err
+	}
+
+	if o.OrderType == DELIVERY {
+		o.Address.DB = o.DB
+		o.Address.DBSession = o.DBSession
+		if err := o.User.GetAddressById(); err != nil {
+			return err
+		}
+	}
+	o.OrderStatus = PENDING
+	return nil
+}
+
+func (o *Order) InsertOrder() error {
+	c := o.DB.C(OrderCollectionName).With(o.DBSession)
+	return c.Insert(&o)
 }
