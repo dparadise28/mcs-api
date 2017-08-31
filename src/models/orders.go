@@ -2,163 +2,98 @@ package models
 
 import (
 	"errors"
+	"github.com/stripe/stripe-go"
+	"github.com/stripe/stripe-go/charge"
+	"github.com/stripe/stripe-go/refund"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	//"log"
 	"time"
 )
 
-const (
-	OrderCollectionName = "Orders"
-
-	PAYMENT_METHODS_KEY = "payment_methods"
-	CASH                = "cash"
-	CC                  = "stripe_cc"
-
-	ORDER_METHODS_KEY = "order_methods"
-	DELIVERY          = "delivery"
-	PICKUP            = "pickup"
-
-	ALL_STATUSES_KEY      = "status"
-	DELIVERY_STATUSES_KEY = "delivery_status"
-	PICKUP_STATUSES_KEY   = "pickup_status"
-
-	PENDING     = "PENDING"
-	APPROVED    = "APPROVED"
-	REJECTED    = "REJECTED"
-	IN_PROGRESS = "IN-PROGRESS"
-	CANCELED    = "CANCELED"
-	EN_ROUTE    = "EN-ROUTE"
-	COMPLETED   = "COMPLETED"
-
-	FAILED_PAYMENT_HOLD    = "FAILED-PAYMENT-HOLD"
-	PAYMENT_ON_HOLD        = "PAYMENT-ON-HOLD"
-	FAILED_PAYMENT_CAPTURE = "FAILED-PAYMENT-CAPTURE"
-	PAYMENT_CAPTURED       = "PAYMENT-CAPTURED"
-)
-
-var (
-	StripeSK = ""
-
-	OrderMethod    = []string{DELIVERY, PICKUP}
-	PaymentMethods = []string{CASH, CC}
-	OrderStatuses  = []string{
-		CANCELED,
-		IN_PROGRESS,
-		COMPLETED,
-		REJECTED,
-		EN_ROUTE,
-		APPROVED,
-		PENDING,
-	}
-	DeliveryOrderStatuses = OrderStatuses
-	PickupOrderStatuses   = []string{
-		CANCELED,
-		IN_PROGRESS,
-		COMPLETED,
-		REJECTED,
-		APPROVED,
-		PENDING,
-	}
-
-	// helper map for all constants to allow for kw lookup
-	CONST_MAP = map[string]map[string]string{
-		PAYMENT_METHODS_KEY: map[string]string{
-			CASH: CASH,
-			CC:   CC,
-		},
-		ORDER_METHODS_KEY: map[string]string{
-			DELIVERY: DELIVERY,
-			PICKUP:   PICKUP,
-		},
-		ALL_STATUSES_KEY: map[string]string{
-			CANCELED:    CANCELED,
-			IN_PROGRESS: IN_PROGRESS,
-			COMPLETED:   COMPLETED,
-			REJECTED:    REJECTED,
-			EN_ROUTE:    EN_ROUTE,
-			APPROVED:    APPROVED,
-			PENDING:     PENDING,
-		},
-		DELIVERY_STATUSES_KEY: map[string]string{
-			CANCELED:    CANCELED,
-			IN_PROGRESS: IN_PROGRESS,
-			COMPLETED:   COMPLETED,
-			REJECTED:    REJECTED,
-			EN_ROUTE:    EN_ROUTE,
-			APPROVED:    APPROVED,
-			PENDING:     PENDING,
-		},
-		PICKUP_STATUSES_KEY: map[string]string{
-			CANCELED:    CANCELED,
-			IN_PROGRESS: IN_PROGRESS,
-			COMPLETED:   COMPLETED,
-			REJECTED:    REJECTED,
-			APPROVED:    APPROVED,
-			PENDING:     PENDING,
-		},
-	}
-)
+var OrderCollectionName = "Orders"
 
 type CashPickupOrderRequest struct {
-	CartID           bson.ObjectId `bson:"cart_id" json:"id" validate:"required"`
+	CartID           bson.ObjectId `bson:"cart_id" json:"cart_id" validate:"required"`
 	StoreID          bson.ObjectId `bson:"store_id" json:"store_id" validate:"required"`
 	UserInstructions string        `bson:"instructions" json:"instructions"`
 }
 
 type CashDeliveryOrderRequest struct {
-	CartID           bson.ObjectId `bson:"cart_id" json:"id" validate:"required"`
-	StoreID          bson.ObjectId `bson:"store_id" json:"store_id" validate:"required"`
-	AddressID        bson.ObjectId `bson:"address_id" json:"address_id" validate:"required"`
-	UserInstructions string        `bson:"instructions" json:"instructions"`
+	CartID           bson.ObjectId   `bson:"cart_id" json:"cart_id" validate:"required"`
+	StoreID          bson.ObjectId   `bson:"store_id" json:"store_id" validate:"required"`
+	Address          DeliveryAddress `bson:"address" json:"address" validate:"required,dive"`
+	UserInstructions string          `bson:"instructions" json:"instructions"`
 }
 
 type CCPickupOrderRequest struct {
 	Tip              uint          `bson:"tip" json:"tip"`
-	CardID           bson.ObjectId `bson:"card_id" json:"card_id"`
-	CartID           bson.ObjectId `bson:"cart_id" json:"id" validate:"required"`
+	CardID           string        `bson:"card_id" json:"card_id"`
+	CartID           bson.ObjectId `bson:"cart_id" json:"cart_id" validate:"required"`
 	StoreID          bson.ObjectId `bson:"store_id" json:"store_id" validate:"required"`
 	UserInstructions string        `bson:"instructions" json:"instructions"`
 }
 
 type CCDeliveryOrderRequest struct {
-	Tip              uint          `bson:"tip" json:"tip"`
-	CardID           bson.ObjectId `bson:"card_id" json:"card_id"`
-	CartID           bson.ObjectId `bson:"cart_id" json:"id" validate:"required"`
-	StoreID          bson.ObjectId `bson:"store_id" json:"store_id" validate:"required"`
-	AddressID        bson.ObjectId `bson:"address_id" json:"address_id" validate:"required"`
-	UserInstructions string        `bson:"instructions" json:"instructions"`
+	Tip              uint            `bson:"tip" json:"tip"`
+	CardID           string          `bson:"card_id" json:"card_id"`
+	CartID           bson.ObjectId   `bson:"cart_id" json:"cart_id" validate:"required"`
+	StoreID          bson.ObjectId   `bson:"store_id" json:"store_id" validate:"required"`
+	Address          DeliveryAddress `bson:"address" json:"address" validate:"required,dive"`
+	UserInstructions string          `bson:"instructions" json:"instructions"`
 }
 
-type OrderPayment struct {
-	ChargeStatus string `bson:"charge_status" json:"charge_status"`
-	ErrorMessage string `bson:"error_message" json:"error_message"`
+type OrderStatusUpdate struct {
+	OrderID   bson.ObjectId `json:"order_id"`
+	NewStatus string        `json:"new_status"`
+	Message   string        `json:"message"`
+}
+
+type OrderStatusLog struct {
+	Status string    `bson:"charge_status" json:"data"`
+	Date   time.Time `bson:"date" json:"date"`
+	Msg    string    `bson:"msg" json:"message"`
+}
+
+type DeliveryAddress struct {
+	City             string  `bson:"city" json:"city"`
+	Phone            string  `bson:"phone" json:"phone" validate:"required"`
+	Line1            string  `bson:"line1" json:"line1" validate:"required"`
+	Route            string  `bson:"route" json:"route"`
+	Country          string  `bson:"country" json:"country" validate:"required"`
+	AptSuite         string  `bson:"apt_suite" json:"apt_suite"`
+	Latitude         float64 `bson:"latitude" json:"latitude" validate:"required,min=-85.0511499,max=85.001"`
+	Longitude        float64 `bson:"longitude" json:"longitude" validate:"required,min=-180.001,max=180.001"`
+	PostalCode       string  `bson:"postal_code" json:"postal_code" validate:"required"`
+	StreetNumber     string  `bson:"street_number" json:"street_number"`
+	AdminAreaLvl1    string  `bson:"administrative_area_level_1" json:"administrative_area_level_1"`
+	FormattedAddress string  `bson:"formatted_address" json:"formatted_address"`
 }
 
 type Order struct {
-	ID                 bson.ObjectId `bson:"_id" json:"id"`
-	Tip                uint          `bson:"tip" json:"tip"`
-	CardID             bson.ObjectId `bson:"card_id" json:"card_id"`
-	UserID             bson.ObjectId `bson:"user_id" json:"user_id"`
-	CartID             bson.ObjectId `bson:"cart_id" json:"id"`
-	StoreID            bson.ObjectId `bson:"store_id" json:"store_id"`
-	ChargeID           bson.ObjectId `bson:"charge_id" json:"charge_id"`
-	AddressID          bson.ObjectId `bson:"address_id" json:"address_id"`
-	OrderType          string        `bson:"order_type" json:"order_type"`
-	OrderStatus        string        `bson:"order_status" json:"order_status"`
-	PaymentMethod      string        `bson:"payment_method" json:"payment_method"`
-	UserInstructions   string        `bson:"instructions" json:"instructions"`
-	StoreMessageToUser string        `bson:"store_msg_to_user" json:"store_message_to_user"`
-	Times              struct {
-		LastUpdatedAt time.Time `bson:"last_updated_at" json:"last_updated_at"`
-		CompletedAt   time.Time `bson:"completed_at" json:"completed_at"`
-		CreatedAt     time.Time `bson:"fulfilled_at" json:"fulfilled_at"`
-	} `bson:"times" json:"times"`
+	ID                 bson.ObjectId    `bson:"_id" json:"id"`
+	Tip                uint             `bson:"tip" json:"tip"`
+	CardID             string           `bson:"card_id" json:"card_id"`
+	UserID             bson.ObjectId    `bson:"user_id" json:"user_id"`
+	CartID             bson.ObjectId    `bson:"cart_id" json:"cart_id"`
+	Address            DeliveryAddress  `bson:"address,omitempty" json:"address,omitempty"`
+	StoreID            bson.ObjectId    `bson:"store_id" json:"store_id"`
+	ChargeID           string           `bson:"charge_id" json:"charge_id"`
+	RefundID           string           `bson:"refund_id" json:"refurn_id"`
+	StatusLog          []OrderStatusLog `bson:"status_log" json:"status_log"`
+	CreatedAt          time.Time        `bson:"created_at" json:"created_at"`
+	OrderType          string           `bson:"order_type" json:"order_type"`
+	OrderStatus        string           `bson:"order_status" json:"order_status"`
+	PaymentMethod      string           `bson:"payment_method" json:"payment_method"`
+	UserInstructions   string           `bson:"instructions" json:"instructions"`
+	StoreMessageToUser string           `bson:"store_msg_to_user" json:"store_message_to_user"`
 
 	// helpers
-	Address Address `bson:"-" json:"-"`
-	Store   Store   `bson:"-" json:"-"`
-	Cart    Cart    `bson:"-" json:"-"`
-	User    User    `bson:"-" json:"-"`
+	DestinationEmail string `bson:"-" json:"-"`
+	Store            Store  `bson:"-" json:"-"`
+	Cart             Cart   `bson:"-" json:"-"`
+	User             User   `bson:"-" json:"-"`
+	NewStatus        string `bson:"-" json:"-"`
 
 	DB        *mgo.Database `bson:"-" json:"-"`
 	DBSession *mgo.Session  `bson:"-" json:"-"`
@@ -175,30 +110,140 @@ func (o *Order) ExpandOrderInfo() error {
 		errors.New("Please add a cc to your wallet")
 	}
 
-	o.store.DB = o.db
-	o.store.DBSession = o.DBSession
+	o.Store.DB = o.DB
+	o.Store.DBSession = o.DBSession
 	if err := o.Store.RetrieveStoreByOID(); err != nil {
 		return err
 	}
 
 	o.Cart.DB = o.DB
 	o.Cart.DBSession = o.DBSession
-	if err := o.Cart.GetCartsById(); err != nil {
+	if err := o.Cart.GetActiveCartsById(); err != nil {
 		return err
 	}
-
-	if o.OrderType == DELIVERY {
-		o.Address.DB = o.DB
-		o.Address.DBSession = o.DBSession
-		if err := o.User.GetAddressById(); err != nil {
-			return err
-		}
-	}
-	o.OrderStatus = PENDING
 	return nil
 }
 
 func (o *Order) InsertOrder() error {
+	o.OrderStatus = PENDING
+	o.ID = bson.NewObjectId()
 	c := o.DB.C(OrderCollectionName).With(o.DBSession)
+	o.CreatedAt = time.Now()
+	o.StatusLog = []OrderStatusLog{
+		OrderStatusLog{
+			Status: o.OrderStatus,
+			Date:   o.CreatedAt,
+			Msg:    "Your order is currently being reviwed by the store.",
+		},
+	}
 	return c.Insert(&o)
+}
+
+func (o *Order) IsValidNewStatus(status *OrderStatusUpdate) bool {
+	for _, allowedNewStatus := range ALLOWED_STATUS_PATH[o.OrderType][o.OrderStatus] {
+		if allowedNewStatus == status.NewStatus {
+			return true
+		}
+	}
+	return false
+}
+
+func (o *Order) DoExternalUpdatesForNewStatus(status *OrderStatusUpdate) (error, Email) {
+	stripe.Key = StripeSK
+	if o.PaymentMethod == CC {
+		if status.NewStatus == REJECTED || status.NewStatus == CANCELED {
+			refundParams := &stripe.RefundParams{Charge: o.ChargeID}
+			refundParams.Params.StripeAccount = o.Store.PaymentDetails.StripeAccountID
+			refundResp, err := refund.New(refundParams)
+			if err != nil {
+				return err, Email{}
+			}
+			o.RefundID = refundResp.ID
+		}
+		if status.NewStatus == COMPLETED {
+			capture := &stripe.CaptureParams{}
+			capture.Params.StripeAccount = o.Store.PaymentDetails.StripeAccountID
+			_, err := charge.Capture(o.ChargeID, capture)
+			if err != nil {
+				return err, Email{}
+			}
+		}
+	}
+	c := o.DB.C(OrderCollectionName).With(o.DBSession)
+	_, err := c.Find(bson.M{
+		"_id": o.ID,
+	}).Apply(mgo.Change{
+		ReturnNew: true,
+		Upsert:    false,
+		Remove:    false,
+		Update: bson.M{
+			"$set": bson.M{
+				"order_status": status.NewStatus,
+				"refund_id":    o.RefundID,
+			},
+			"$push": bson.M{
+				"status_log": OrderStatusLog{
+					Status: status.NewStatus,
+					Date:   time.Now(),
+					Msg:    status.Message,
+				},
+			},
+		},
+	}, o)
+	return err, o.CompletedEmail()
+}
+
+func (o *Order) UpdateOrderStatus(status *OrderStatusUpdate) (error, Email) {
+	if o.IsValidNewStatus(status) {
+		return o.DoExternalUpdatesForNewStatus(status)
+	}
+	return errors.New("Invalid status selected."), Email{}
+}
+
+func (o *Order) GetActiveByID() error {
+	c := o.DB.C(OrderCollectionName).With(o.DBSession)
+	return c.Find(bson.M{
+		"_id": o.ID,
+		"order_status": bson.M{
+			"$in": []string{
+				IN_PROGRESS,
+				EN_ROUTE,
+				APPROVED,
+				PENDING,
+			},
+		},
+	}).One(o)
+}
+
+func (o *Order) GetByID() error {
+	c := o.DB.C(OrderCollectionName).With(o.DBSession)
+	return c.Find(bson.M{
+		"_id": o.ID,
+	}).One(o)
+}
+
+func (o *Order) RetrieveActiveStoreOrders() ([]Order, error) {
+	c := o.DB.C(OrderCollectionName).With(o.DBSession)
+	orders := []Order{}
+	err := c.Find(bson.M{
+		"store_id": o.StoreID,
+		"order_status": bson.M{
+			"$in": []string{
+				IN_PROGRESS,
+				EN_ROUTE,
+				APPROVED,
+				PENDING,
+			},
+		},
+	}).All(&orders)
+	return orders, err
+}
+
+func (o *Order) RetrieveAllUserOrders() ([]Order, error) {
+	c := o.DB.C(OrderCollectionName).With(o.DBSession)
+	orders := []Order{}
+	err := c.Find(bson.M{
+		"user_id": o.UserID,
+	}).All(&orders)
+	return orders, err
 }

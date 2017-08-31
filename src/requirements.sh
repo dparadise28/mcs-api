@@ -30,3 +30,6 @@ go get github.com/rs/cors
 
 echo aws dependancies
 go get -u github.com/aws/aws-sdk-go
+
+echo stripe shit
+go get github.com/stripe/stripe-go

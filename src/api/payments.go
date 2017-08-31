@@ -9,7 +9,7 @@ import (
 	"github.com/stripe/stripe-go/account"
 	"github.com/stripe/stripe-go/card"
 	"github.com/stripe/stripe-go/customer"
-	//"gopkg.in/mgo.v2/bson"
+	"gopkg.in/mgo.v2/bson"
 	//"log"
 	"models"
 	"net/http"
@@ -20,32 +20,44 @@ import (
 
 func CreateStoreStripeCustomAccount(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var store models.Store
+	var paymentDetails models.StorePaymentDetails
 	v := new(tools.DefaultValidator)
-	if err := json.NewDecoder(r.Body).Decode(&store.PaymentDetails); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&paymentDetails); err != nil {
 		models.WriteNewError(w, err)
 		return
 	}
-	if validationErr := v.ValidateIncomingJsonRequest(&store.PaymentDetails); validationErr.Status != 200 {
+	if validationErr := v.ValidateIncomingJsonRequest(&paymentDetails); validationErr.Status != 200 {
 		models.WriteError(w, &validationErr)
 		return
 	}
 
-	resp, err := CreateStoreStripeCustomAccountImpl(w, r, ps, &store)
+	store.PaymentDetails = paymentDetails
+	store.DB = db.Database
+	store.DBSession = store.DB.Session.Copy()
+	defer store.DBSession.Close()
+	resp, err, isStripeErr := CreateStoreStripeCustomAccountImpl(w, r, ps, &store)
 	if err != nil {
-		models.WriteNewError(w, err)
+		if isStripeErr {
+			json.NewEncoder(w).Encode(err)
+		} else {
+			models.WriteNewError(w, err)
+		}
+		return
 	}
 	json.NewEncoder(w).Encode(resp)
 }
 
 // ::TODO:: this should prob be part of the store.PaymentDetails struct
-func CreateStoreStripeCustomAccountImpl(w http.ResponseWriter, r *http.Request, ps httprouter.Params, store *models.Store) (*stripe.Account, error) {
+func CreateStoreStripeCustomAccountImpl(w http.ResponseWriter, r *http.Request, ps httprouter.Params, store *models.Store) (*stripe.Account, error, bool) {
 	stripe.Key = models.StripeSK
 	act := stripe.Account{}
 	BusinessType := stripe.Company
 	if store.PaymentDetails.BusinessType == "individual" {
 		BusinessType = stripe.Individual
 	} else if store.PaymentDetails.BusinessType != "company" {
-		return &act, errors.New("Invalid option provided for business_type. Field must either individual or company")
+		return &act, errors.New(
+			"Invalid option provided for business_type. Field must either individual or company",
+		), false
 	}
 	params := &stripe.AccountParams{
 		Type:    stripe.AccountTypeCustom,
@@ -85,9 +97,14 @@ func CreateStoreStripeCustomAccountImpl(w http.ResponseWriter, r *http.Request, 
 	}
 	new_act, err := account.New(params)
 	if err != nil {
-		return &act, err
+		return &act, err, true
 	} else {
-		return new_act, nil
+		store.PaymentDetails.StripeAccountID = new_act.ID
+		store.ID = store.PaymentDetails.StoreID
+		store.PaymentDetails.LegalEntity.BillingAddress.ID = store.ID
+		store.PaymentDetails.LegalEntity.BillingAddress.UserID = bson.ObjectIdHex(r.Header.Get(models.USERID_COOKIE_NAME))
+		setStorePaymentDetailsErr := store.AddStoreCCPaymentMethod()
+		return new_act, setStorePaymentDetailsErr, false
 	}
 }
 

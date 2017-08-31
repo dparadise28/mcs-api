@@ -4,6 +4,7 @@ import (
 	"errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	// "log"
 	"strconv"
 	"time"
 )
@@ -38,7 +39,8 @@ type Cart struct {
 	StoreTaxRate float64       `bson:"tax_rate" json:"tax_rate"`
 
 	//StoreInfo Store `bson:"-" json:"-"`
-	IsNew bool `bson:"-" json:"-"`
+	IsNew    bool `bson:"-" json:"-"`
+	ApplyFee bool `bson:"-" json:"-"`
 
 	DB        *mgo.Database `bson:"-" json:"-"`
 	DBSession *mgo.Session  `bson:"-" json:"-"`
@@ -47,7 +49,7 @@ type Cart struct {
 func (cart *Cart) UpdateProductQuantityQueries(p CartProduct) []bson.M {
 	pushQuery := bson.M{
 		"$set": bson.M{
-			"last_updated": cart.LastUpdated,
+			"last_updated": time.Now(),
 		},
 		"$push": bson.M{
 			"products": p,
@@ -60,7 +62,7 @@ func (cart *Cart) UpdateProductQuantityQueries(p CartProduct) []bson.M {
 			},
 		},
 		"$set": bson.M{
-			"last_updated": cart.LastUpdated,
+			"last_updated": time.Now(),
 			"cart_state":   CartStates["ACTIVE"],
 		},
 	}
@@ -73,11 +75,12 @@ func (cart *Cart) UpdateProductQuantityQueries(p CartProduct) []bson.M {
 				},
 			},
 			"$set": bson.M{
-				"store_name":   cart.StoreName,
-				"last_updated": cart.LastUpdated,
+				"last_updated": time.Now(),
 				"delivery_fee": cart.DeliveryFee,
-				"tax_rate":     cart.StoreTaxRate,
+				"created_at":   time.Now(),
+				"store_name":   cart.StoreName,
 				"cart_state":   CartStates["ACTIVE"],
+				"tax_rate":     cart.StoreTaxRate,
 			},
 		}
 	}
@@ -159,7 +162,10 @@ func (cart *Cart) UpdateCartTotals() {
 		cart.Totals.Subtotal += product.PriceCents * uint32(product.Quantity)
 	}
 	cart.Totals.Tax = float64(cart.Totals.Subtotal) * cart.StoreTaxRate / 100.00
-	cart.Totals.Total = cart.Totals.Tax + float64(cart.Totals.Subtotal) + float64(cart.DeliveryFee)
+	cart.Totals.Total = cart.Totals.Tax + float64(cart.Totals.Subtotal)
+	if cart.ApplyFee {
+		cart.Totals.Total = float64(cart.DeliveryFee)
+	}
 }
 
 func FormatPriceCents(n int64) string {
@@ -197,15 +203,12 @@ func FormatPriceCents(n int64) string {
 func (cart *Cart) GetCartProductsOrderMarkup() string {
 	markup := ""
 	for _, p := range cart.Products {
-		markup += `<br><br>
-			<div class="column-left">
-				<b>` + strconv.Itoa(int(p.Quantity)) + ` </b> x
-			</div>
-			<div class="column-center">` + p.ProductTitle +
-			`</div>
-			<div class="column-right">
-				<b>` + FormatPriceCents(int64(p.PriceCents)) + `</b>
-			</div>`
+		if p.Quantity > 0 {
+			markup += `<br><br>
+			<div class="column-left"><b>` + strconv.Itoa(int(p.Quantity)) + ` </b> x </b></div>
+			<div class="column-center" align="left">` + p.ProductTitle + `</div>
+			<div class="column-right">` + FormatPriceCents(int64(p.PriceCents)) + `</div>`
+		}
 	}
 	return markup
 }
@@ -257,9 +260,21 @@ func (cart *Cart) GetCartsById() error {
 	return nil
 }
 
-func (cart *Cart) ActiveUserCartCountForStore() (int, error) {
+func (cart *Cart) GetActiveCartsById() error {
 	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
-	return c.Find(bson.M{
+
+	if err := c.Find(bson.M{
+		"_id":        cart.ID,
+		"cart_state": CartStates["ACTIVE"],
+	}).One(cart); err != nil {
+		return err
+	}
+	cart.UpdateCartTotals()
+	return nil
+}
+
+func (cart *Cart) ActiveUserCartCountForStore() (int, error) {
+	return cart.DB.C(CartCollectionName).With(cart.DBSession).Find(bson.M{
 		"user_id":    cart.UserID,
 		"store_id":   cart.StoreID,
 		"cart_state": CartStates["ACTIVE"],
@@ -267,6 +282,10 @@ func (cart *Cart) ActiveUserCartCountForStore() (int, error) {
 }
 
 func (cart *Cart) ReActivateCart() error {
+	// copy vars here so theyre not overriden on fetch (need better abstraction; ok for now)
+	db := cart.DB
+	sess := cart.DBSession
+
 	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
 	c.Find(bson.M{
 		"_id":        cart.ID,
@@ -278,6 +297,7 @@ func (cart *Cart) ReActivateCart() error {
 			"The cart you have selected is either empty or could not be found",
 		)
 	}
+	cart.DB, cart.DBSession = db, sess
 	if cartCount, countErr := cart.ActiveUserCartCountForStore(); countErr != nil {
 		return countErr
 	} else if cartCount != 0 {

@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"strconv"
 	//"strings"
+	"gopkg.in/mgo.v2/bson"
 	"tools"
-	//"gopkg.in/mgo.v2/bson"
 	//"log"
 )
 
@@ -77,13 +77,14 @@ func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		return
 	}
 	if insert_err := store.Insert(); insert_err != nil {
-		models.WriteError(w, models.ErrResourceConflict)
+		models.WriteNewError(w, insert_err)
 		return
 	}
 	UserSetStoreOwnerPerms(w, r, store.ID.Hex(), store.Name)
 	json.NewEncoder(w).Encode(store)
 }
 
+// helper method if we want to include the payment details in the store creation call
 func StoreAddCCPaymentMethod(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var store models.Store
 	store.DB = db.Database
@@ -99,19 +100,29 @@ func StoreAddCCPaymentMethod(w http.ResponseWriter, r *http.Request, ps httprout
 		models.WriteError(w, &validationErr)
 		return
 	}
-	act, err := CreateStoreStripeCustomAccountImpl(w, r, ps, &store)
+	act, err, isStripeError := CreateStoreStripeCustomAccountImpl(w, r, ps, &store)
 	if err != nil {
-		models.WriteNewError(w, err)
+		if isStripeError {
+			json.NewEncoder(w).Encode(err)
+		} else {
+			models.WriteNewError(w, err)
+		}
 		return
 	}
 	store.PaymentDetails.StripeAccountID = act.ID
-	store.AddStoreCCPaymentMethod()
+	if err := store.AddStoreCCPaymentMethod(); err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
 	json.NewEncoder(w).Encode(store)
 }
 
 func StoreInfoUpdate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	var store models.Store
+	var store models.StoreInfo
+	store.ID = bson.ObjectIdHex(ps.ByName("store_id"))
 	store.DB = db.Database
+	store.Address.ID = bson.NewObjectId()
+	store.Address.UserID = store.ID
 	store.DBSession = store.DB.Session.Copy()
 	defer store.DBSession.Close()
 
@@ -124,6 +135,9 @@ func StoreInfoUpdate(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 		models.WriteError(w, &validationErr)
 		return
 	}
-	store.UpdateStoreInfo()
+	if err := store.UpdateStoreInfo(); err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
 	json.NewEncoder(w).Encode(store)
 }

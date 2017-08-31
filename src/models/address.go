@@ -10,7 +10,7 @@ import (
 var AddressCollectionName = "addresses"
 
 type Address struct {
-	ID               bson.ObjectId `bson:"_id" json:"address_id"`
+	ID               bson.ObjectId `bson:"_id" json:"address_id,omitempty"`
 	Name             string        `bson:"name" json:"name"`
 	City             string        `bson:"city" json:"city"`
 	Phone            string        `bson:"phone" json:"phone"`
@@ -20,7 +20,7 @@ type Address struct {
 	Default          bool          `bson:"default" json:"default"`
 	Country          string        `bson:"country" json:"country" validate:"required"`
 	Location         GeoJson       `bson:"location" json:"location"`
-	AptSuite         GeoJson       `bson:"apt_suite" json:"apt_suite"`
+	AptSuite         string        `bson:"apt_suite" json:"apt_suite"`
 	Latitude         float64       `bson:"latitude" json:"latitude" validate:"required,min=-85.0511499,max=85.001"`
 	Longitude        float64       `bson:"longitude" json:"longitude" validate:"required,min=-180.001,max=180.001"`
 	PostalCode       string        `bson:"postal_code" json:"postal_code" validate:"required"`

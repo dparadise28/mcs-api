@@ -16,7 +16,7 @@ func AddReview(w http.ResponseWriter, r *http.Request, ps httprouter.Params, rev
 	var review models.Review
 	review.DB = db.Database
 	review.DBSession = review.DB.Session.Copy()
-	review.ReviewFor = models.StoreReview
+	review.ReviewFor = reviewType
 	review.UserId = bson.ObjectIdHex(r.Header.Get(models.USERID_COOKIE_NAME))
 	defer review.DBSession.Close()
 

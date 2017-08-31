@@ -33,11 +33,11 @@ type User struct {
 }
 
 type UserAPIResponse struct {
-	ID           bson.ObjectId `bson:"_id,omitempty" json:"user_id"`
-	IsStoreOwner bool          `bson:"is_store_owner" json:"is_store_owner" validate:"required"`
-	Confirmed    bool          `bson:"confirmed" json:"confirmed"`
-	Email        string        `bson:"email" json:"email" validate:"required,email"`
-	Roles        UserRoles     `bson:"user_roles" json:"user_roles"`
+	ID           bson.ObjectId     `bson:"_id,omitempty" json:"user_id"`
+	IsStoreOwner bool              `bson:"is_store_owner" json:"is_store_owner" validate:"required"`
+	Confirmed    bool              `bson:"confirmed" json:"confirmed"`
+	Email        string            `bson:"email" json:"email" validate:"required,email"`
+	Roles        UserRolesResponse `bson:"user_roles" json:"user_roles"`
 }
 
 /*

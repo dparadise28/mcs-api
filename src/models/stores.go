@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -33,15 +34,15 @@ type StoreDelivery struct {
 	// for now. That can be split out form the base
 	// store model
 	Fee       uint32 `bson:"fee,omitempty" json:"delivery_fee"`
-	Offered   bool   `bson:"offered" json:"service_offered" validate:"required"`
+	Offered   bool   `bson:"offered" json:"service_offered"`
 	MaxDist   int    `bson:"max_distance,omitempty" json:"delivery_distance"`
-	MinTime   uint8  `bson:"min_time,omitempty" json:"maximum_time_to_delivery"`
-	MaxTime   uint8  `bson:"max_time,omitempty" json:"minimum_time_to_delivery"`
+	MinTime   uint8  `bson:"min_time,omitempty" json:"minimum_time_to_delivery"`
+	MaxTime   uint8  `bson:"max_time,omitempty" json:"maximum_time_to_delivery"`
 	MinAmount uint16 `bson:"min_amount,omitempty" json:"delivery_minimum"`
 }
 
 type StorePickup struct {
-	Offered         bool  `json:"offered" validate:"required"`
+	Offered         bool  `json:"offered"`
 	MinTime         uint8 `bson:"min_time" json:"minimum_time_to_pickup" validate:"max=90,min=1"`
 	MaxTime         uint8 `bson:"max_time" json:"maximum_time_to_pickup" validate:"max=90,min=1"`
 	PickupItemCount struct {
@@ -112,12 +113,57 @@ type Store struct {
 	DBSession *mgo.Session  `bson:"-" json:"-"`
 }
 
+type StoreReturn struct {
+	ID               bson.ObjectId       `bson:"_id,omitempty" json:"store_id"`
+	Name             string              `bson:"name" json:"name"`
+	Image            string              `json:"image"`
+	Phone            string              `json:"phone" validate:"required"`
+	CTree            []StoreCategory     `bson:"categories" json:"categories" validate:"required,dive"`
+	Email            string              `json:"email" validate:"required,email"`
+	Pickup           StorePickup         `json:"pickup" validate:"required,dive"`
+	Address          Address             `json:"address" validate:"required,dive"`
+	TaxRate          float64             `bson:"tax_rate" json:"tax_rate" validate:"required"`
+	Enabled          bool                `bson:"enabled" json:"enabled"`
+	Delivery         StoreDelivery       `json:"delivery" validate:"dive"`
+	Distance         float64             `bson:"distance,omitempty" json:"distance"`
+	ReviewScore      int64               `bson:"review_score" json:"review_score"`
+	ReviewCount      int64               `bson:"review_count" json:"review_count"`
+	WorkingHours     WeeklyWorkingHours  `bson:"working_hours" json:"working_hours" validate:"required,dive"`
+	CategoryNames    []string            `bson:"c_names" json:"category_names"`
+	PaymentDetails   StorePaymentDetails `bson:"payment_details" json:"payment_details" validate:"-"`
+	LongDescription  string              `bson:"long_desc" json:"long_description" validate:"max=200"`
+	ShortDescription string              `bson:"short_desc" json:"short_description" validate:"max=50"`
+}
+
+type StoreInfo struct {
+	ID               bson.ObjectId      `bson:"_id,omitempty" json:"store_id"`
+	Name             string             `bson:"name" json:"name"`
+	Image            string             `json:"image"`
+	Phone            string             `json:"phone" validate:"required"`
+	Email            string             `json:"email" validate:"required,email"`
+	Pickup           StorePickup        `json:"pickup" validate:"required,dive"`
+	Address          Address            `json:"address" validate:"required,dive"`
+	TaxRate          float64            `bson:"tax_rate" json:"tax_rate" validate:"required"`
+	Delivery         StoreDelivery      `json:"delivery" validate:"dive"`
+	WorkingHours     WeeklyWorkingHours `bson:"working_hours" json:"working_hours" validate:"required,dive"`
+	LongDescription  string             `bson:"long_desc" json:"long_description" validate:"max=200"`
+	ShortDescription string             `bson:"short_desc" json:"short_description" validate:"max=50"`
+
+	DB        *mgo.Database `bson:"-" json:"-"`
+	DBSession *mgo.Session  `bson:"-" json:"-"`
+}
+
 func (s *Store) PrepStoreEntitiesForInsert() error {
 	s.PaymentDetails.AcceptsCCPayment = false
 	s.PaymentDetails.AcceptsCashPayment = true
 	s.Enabled = false
 
 	s.ID = bson.NewObjectId()
+	s.Address.ID = bson.NewObjectId()
+	s.Address.UserID = s.ID
+	s.PaymentDetails.LegalEntity.BillingAddress.ID = s.ID
+	s.PaymentDetails.LegalEntity.BillingAddress.UserID = s.ID
+	s.PaymentDetails.StoreID = s.ID
 	s.CategoryNames = []string{}
 	for category_index, _ := range s.CTree {
 		c_id := bson.NewObjectId()
@@ -154,6 +200,9 @@ func (s *Store) Insert() error {
 	s.Address.Location.Type = "Point"
 	s.Address.Location.Coordinates = []float64{s.Address.Longitude, s.Address.Latitude}
 	if insert_err := c.Insert(&s); insert_err != nil {
+		log.Println(insert_err)
+		st, _ := json.Marshal(s)
+		log.Println(string(st))
 		// dont move on if store record is faulty
 		if strings.Count(insert_err.Error(), "ObjectId") == 1 {
 			log.Println("during store")
@@ -202,14 +251,14 @@ func (s *Store) RetrieveStoreByID(id string) error {
 
 func (s *Store) RetrieveStoreByOID() error {
 	query := bson.M{
-		"_id": store.ID,
+		"_id": s.ID,
 	}
 	c := s.DB.C(StoreCollectionName).With(s.DBSession)
 	err := c.Find(query).One(s)
 	return err
 }
 
-func (s *Store) RetrieveFullStoreByID(id string) (error, bson.M) {
+func (s *Store) RetrieveFullStoreByID(id string) (error, StoreReturn) {
 	pipeline := []bson.M{
 		bson.M{
 			"$match": bson.M{
@@ -247,6 +296,7 @@ func (s *Store) RetrieveFullStoreByID(id string) (error, bson.M) {
 			"$group": bson.M{
 				"_id":               "$_id",
 				"name":              bson.M{"$first": "$name"},
+				"email":             bson.M{"$first": "$email"},
 				"image":             bson.M{"$first": "$image"},
 				"phone":             bson.M{"$first": "$phone"},
 				"pickup":            bson.M{"$first": "$pickup"},
@@ -270,7 +320,7 @@ func (s *Store) RetrieveFullStoreByID(id string) (error, bson.M) {
 	}
 	c := s.DB.C(StoreCollectionName).With(s.DBSession)
 	pipe := c.Pipe(pipeline)
-	resp := []bson.M{}
+	resp := []StoreReturn{}
 	err := pipe.All(&resp)
 	return err, resp[0]
 }
@@ -300,8 +350,10 @@ func (s *Store) FindStoresByLocation(long float64, lat float64, maxDist float64,
 	return err, stores
 }
 
-func (s *Store) UpdateStoreInfo() {
+func (s *StoreInfo) UpdateStoreInfo() error {
 	c := s.DB.C(StoreCollectionName).With(s.DBSession)
+	s.Address.Location.Type = "Point"
+	s.Address.Location.Coordinates = []float64{s.Address.Longitude, s.Address.Latitude}
 	change := mgo.Change{
 		ReturnNew: true,
 		Upsert:    false,
@@ -316,20 +368,20 @@ func (s *Store) UpdateStoreInfo() {
 				"address":       s.Address,
 				"delivery":      s.Delivery,
 				"tax_rate":      s.TaxRate,
-				"distance":      s.Distance,
 				"long_desc":     s.LongDescription,
 				"short_desc":    s.ShortDescription,
 				"working_hours": s.WorkingHours,
 			},
 		},
 	}
-	info, _ := c.Find(bson.M{
+	_, err := c.Find(bson.M{
 		"_id": s.ID,
 	}).Apply(change, s)
-	log.Println(info)
+	//log.Println(info)
+	return err
 }
 
-func (s *Store) AddStoreCCPaymentMethod() {
+func (s *Store) AddStoreCCPaymentMethod() error {
 	c := s.DB.C(StoreCollectionName).With(s.DBSession)
 	s.PaymentDetails.AcceptsCCPayment = true
 	change := mgo.Change{
@@ -342,8 +394,8 @@ func (s *Store) AddStoreCCPaymentMethod() {
 			},
 		},
 	}
-	info, _ := c.Find(bson.M{
+	_, err := c.Find(bson.M{
 		"_id": s.ID,
 	}).Apply(change, s)
-	log.Println(info)
+	return err
 }
