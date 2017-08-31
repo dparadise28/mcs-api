@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	ConfirmationCodeRandomCharKeySpace = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-!$&:;<=>?@_~"
+	ConfirmationCodeRandomCharKeySpace = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-!$&:;=?@_~"
 	DeafultPWHashCost                  = 8
 	letterIdxBits                      = 6                    // 6 bits to represent 64 possibilities / indexes
 	letterIdxMask                      = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits

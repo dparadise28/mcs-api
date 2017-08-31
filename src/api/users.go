@@ -37,8 +37,17 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 		Update:    query,
 	}
 	_, err := c.Find(bson.M{
-		"_id":               bson.ObjectIdHex(ps.ByName("user_id")),
-		"confirmation_code": ps.ByName("confirmation_code"),
+		"_id": bson.ObjectIdHex(ps.ByName("user_id")),
+		"$or": []bson.M{
+			bson.M{
+				"confirmed":         false,
+				"confirmation_code": ps.ByName("confirmation_code"),
+			},
+			bson.M{
+				"confirmed":         true,
+				"confirmation_code": "",
+			},
+		},
 	}).Apply(change, &user)
 	if err != nil {
 		log.Println(err, ps.ByName("user_id"), ps.ByName("confirmation_code"))
@@ -52,6 +61,7 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	// ::TODO:: dynamic external routing for things like this
 	log.Println("redirecting")
 	http.Redirect(w, r, "http://mycorner.store:8003/#/login", http.StatusTemporaryRedirect)
+	return
 }
 
 func UserSetStoreOwnerPerms(w http.ResponseWriter, r *http.Request, storeId string, storeName string) {
@@ -131,7 +141,6 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	user.Password = tools.HashPassword(user.Password)
 	user.Email = strings.ToLower(user.Email)
 
-	// copy db session for the stores collection and close on completion
 	session := db.Database.Session.Copy()
 	defer session.Close()
 	c := db.Database.C(models.UserCollectionName).With(session)

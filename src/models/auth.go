@@ -44,6 +44,11 @@ type UserRoles struct {
 	Access map[string]string
 }
 
+type UserRolesResponse struct {
+	Access map[string]string
+	Stores map[string]string `bson:"store_map" json:"store_map"`
+}
+
 type CustomClaims struct {
 	Perms            map[string]string
 	Confirmed        bool

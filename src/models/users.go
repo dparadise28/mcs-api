@@ -33,11 +33,11 @@ type User struct {
 }
 
 type UserAPIResponse struct {
-	ID           bson.ObjectId `bson:"_id,omitempty" json:"user_id"`
-	IsStoreOwner bool          `bson:"is_store_owner" json:"is_store_owner" validate:"required"`
-	Confirmed    bool          `bson:"confirmed" json:"confirmed"`
-	Email        string        `bson:"email" json:"email" validate:"required,email"`
-	Roles        UserRoles     `bson:"user_roles" json:"user_roles"`
+	ID           bson.ObjectId     `bson:"_id,omitempty" json:"user_id"`
+	IsStoreOwner bool              `bson:"is_store_owner" json:"is_store_owner" validate:"required"`
+	Confirmed    bool              `bson:"confirmed" json:"confirmed"`
+	Email        string            `bson:"email" json:"email" validate:"required,email"`
+	Roles        UserRolesResponse `bson:"user_roles" json:"user_roles"`
 }
 
 /*
@@ -129,4 +129,12 @@ func (u *UserAPIResponse) GetByIdStr(db *mgo.Database, id string) {
 
 	c := db.C(UserCollectionName).With(session)
 	c.Find(bson.M{"_id": bson.ObjectIdHex(id)}).One(u)
+}
+
+func (u *User) GetById() error {
+	c := u.DB.C(UserCollectionName).With(u.DBSession)
+	err := c.Find(bson.M{
+		"_id": u.ID,
+	}).One(u)
+	return err
 }

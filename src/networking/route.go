@@ -806,14 +806,22 @@ var APIRouteList = []map[string]map[string]interface{}{
 	map[string]map[string]interface{}{
 		"/payment/store/create/account": {
 			"control_method": "POST",
-			"post_payload":   models.Store{},
+			"post_payload":   models.StorePaymentDetails{},
 			"authenticate": []string{
 				models.ACCESSROLE_CONFIRMED_USER,
 			},
 			"max_rps":    nil,
 			"api_method": api.CreateStoreStripeCustomAccount,
 			"description": []string{
-				"create a new custom stripe account for onboarding stores",
+				"Create a new custom stripe account for onboarding stores. The",
+				"account created for the store during this request is fully",
+				"managed by the platform. We can always add more functionality",
+				"as needed. We decided to go with stripe for our initial payment",
+				"functionality and will likely be looking to integrate with",
+				"additional payment providers as we grow. Stripe also provides",
+				"you with some great dashboards, metrics, logs, and other useful",
+				"tools that are there if we ever need to do anything manual or",
+				"just use it for convenience.",
 			},
 		},
 	},
@@ -887,6 +895,215 @@ var APIRouteList = []map[string]map[string]interface{}{
 			"description": []string{
 				"Convenince method for exposing currently supported pickup order",
 				"statuses.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/helper/order/status/tree": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.StatusTree,
+			"description": []string{
+				"Convenince method for exposing currently supported all order",
+				"status paths in the way you can traverse them.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/helper/order/status/path": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.StatusPaths,
+			"description": []string{
+				"Convenince method for exposing currently supported order",
+				"status paths.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/helper/email/queue/length": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.EmailQueueLength,
+			"description": []string{
+				"Convenince method for tracking email queue length.",
+			},
+		},
+	},
+
+	// reviews
+	map[string]map[string]interface{}{
+		"/review/order/add": {
+			"control_method": "POST",
+			"post_payload":   models.Review{},
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.ReviewOrder,
+			"description": []string{
+				"This call follows the same convention as the store review but also",
+				"requires an order_id.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/review/store/add": {
+			"control_method": "POST",
+			"post_payload":   models.Review{},
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.ReviewStore,
+			"description": []string{
+				"This call is exposed to review a store. It is pretty interactive",
+				"and should display valid interactive errors. The required fields",
+				"for this call are score, and store_id. The other fields will be",
+				"filled out automatically for this call, with the exception of the",
+				"optional field, comment, which you can specify any time. The max",
+				"field length allowed for the comment is 200 characters.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/review/platform/add": {
+			"control_method": "POST",
+			"post_payload":   models.Review{},
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.ReviewPlatform,
+			"description": []string{
+				"This follows the same convention as adding a store review but",
+				"without the restriction of requiring a store id and there is no",
+				"api exposed to retrieve these reviews. We can expose this when",
+				"we have a platform admin ui to view these.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/review/store/retrieve": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.GetStoreReviews,
+			"description": []string{
+				"Api to expose all reviews currently made by customers of the store",
+				"specified in the query params (url?store_id=store_id)",
+			},
+		},
+	},
+
+	// orders
+	map[string]map[string]interface{}{
+		"/order/cash/pickup": {
+			"control_method": "POST",
+			"post_payload":   models.CashPickupOrderRequest{},
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.PayWithCashForPickup,
+			"description": []string{
+				"This is a simple interface. The reason being that this call is intended",
+				"to simply keep track of a cash transaction keepning in person. We do",
+				"not charge for these types of orders. It is, in a sense, a notification",
+				"service that informs the store and user of the transaction that is",
+				"initiated through the platform. You may still go through the same order",
+				"status update processes exposed to keep the user aware of the state of",
+				"his/her order. This is the predfered useage pattern as we are able to",
+				"perform analytics and other actionable inferances given the information",
+				"collected through the platform which may be helpful to the store as well",
+				"as the platform. As a result of performing this action you are setting",
+				"the state of your cart as completed. This means that it will be availible",
+				"for reorder but it will need to be reinstated in order to mutate its.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/order/cash/delivery": {
+			"control_method": "POST",
+			"post_payload":   models.CashDeliveryOrderRequest{},
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.PayWithCashForDelivery,
+			"description": []string{
+				"The same description provided for cash pickups above can be saif about",
+				"deliverys with the small exception of the additional requirement of an",
+				"address id in the post payload.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/order/cc/pickup": {
+			"control_method": "POST",
+			"post_payload":   models.CCPickupOrderRequest{},
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.PayWithCCForPickup,
+			"description": []string{
+				"I will not repeat the description stated for the analogous pickup cash",
+				"order. All of the same steps are taken with addition to the a hold charge",
+				"on the default card set on the users account. If the user decides to",
+				"another card that is associated with their stripe customer account managed",
+				"by the platform then they may do so by using the card_id field in the post",
+				"payload. If this is not provided then the default card will be charged",
+				"automatically. The charge does not go through till the stores make the call",
+				"to specify the order has been complete (picked up in this case). The fees",
+				"will be included in the charge hold as well.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/order/cc/delivery": {
+			"control_method": "POST",
+			"post_payload":   models.CCDeliveryOrderRequest{},
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.PayWithCCForDelivery,
+			"description": []string{
+				"You will probably get tired of reading this but the same description provided",
+				"for cc pickup orders applies here with the exception of the additional address",
+				"id requirement.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/store/orders/retrieve/active/all/:store_id": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.GetActiveStoreOrders,
+			"description": []string{
+				"This call exposes all orders yet to be completed, rejected, and or canceled.",
+			},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/user/orders/active/retrieve": {
+			"control_method": "GET",
+			"post_payload":   nil,
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.GetAllUserOrders,
+			"description":    []string{},
+		},
+	},
+	map[string]map[string]interface{}{
+		"/orders/update/status": {
+			"control_method": "POST",
+			"post_payload":   models.OrderStatusUpdate{},
+			"authenticate":   []string{},
+			"max_rps":        nil,
+			"api_method":     api.UpdateOrderStatus,
+			"description": []string{
+				"This one is pretty informative through the interactions. It's interface is simple but",
+				"logs of background manuvering is happening throughout. The main thing to keep in mind",
+				"is to make sure to use a valid status when attempting to update the order. It's safe",
+				"to try and interact with it in any way you like. The worst that has happened in testing",
+				"is the call errors out and reacts as expected with a, hopefully, reasonable error message.",
 			},
 		},
 	},

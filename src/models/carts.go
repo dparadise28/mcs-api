@@ -4,6 +4,8 @@ import (
 	"errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	// "log"
+	"strconv"
 	"time"
 )
 
@@ -37,7 +39,8 @@ type Cart struct {
 	StoreTaxRate float64       `bson:"tax_rate" json:"tax_rate"`
 
 	//StoreInfo Store `bson:"-" json:"-"`
-	IsNew bool `bson:"-" json:"-"`
+	IsNew    bool `bson:"-" json:"-"`
+	ApplyFee bool `bson:"-" json:"-"`
 
 	DB        *mgo.Database `bson:"-" json:"-"`
 	DBSession *mgo.Session  `bson:"-" json:"-"`
@@ -46,7 +49,7 @@ type Cart struct {
 func (cart *Cart) UpdateProductQuantityQueries(p CartProduct) []bson.M {
 	pushQuery := bson.M{
 		"$set": bson.M{
-			"last_updated": cart.LastUpdated,
+			"last_updated": time.Now(),
 		},
 		"$push": bson.M{
 			"products": p,
@@ -59,7 +62,7 @@ func (cart *Cart) UpdateProductQuantityQueries(p CartProduct) []bson.M {
 			},
 		},
 		"$set": bson.M{
-			"last_updated": cart.LastUpdated,
+			"last_updated": time.Now(),
 			"cart_state":   CartStates["ACTIVE"],
 		},
 	}
@@ -72,11 +75,12 @@ func (cart *Cart) UpdateProductQuantityQueries(p CartProduct) []bson.M {
 				},
 			},
 			"$set": bson.M{
-				"store_name":   cart.StoreName,
-				"last_updated": cart.LastUpdated,
+				"last_updated": time.Now(),
 				"delivery_fee": cart.DeliveryFee,
-				"tax_rate":     cart.StoreTaxRate,
+				"created_at":   time.Now(),
+				"store_name":   cart.StoreName,
 				"cart_state":   CartStates["ACTIVE"],
+				"tax_rate":     cart.StoreTaxRate,
 			},
 		}
 	}
@@ -129,12 +133,84 @@ func (cart *Cart) AbandonCart() error {
 	return nil
 }
 
+func (cart *Cart) CompleteCart() error {
+	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
+	change := mgo.Change{
+		ReturnNew: true,
+		Upsert:    false,
+		Remove:    false,
+		Update: bson.M{
+			"$set": bson.M{
+				"last_updated": time.Now(),
+				"cart_state":   CartStates["COMPLETED"],
+			},
+		},
+	}
+	_, err := c.Find(bson.M{
+		"_id":        cart.ID,
+		"user_id":    cart.UserID,
+		"cart_state": CartStates["ACTIVE"],
+	}).Apply(change, cart)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (cart *Cart) UpdateCartTotals() {
 	for _, product := range cart.Products {
 		cart.Totals.Subtotal += product.PriceCents * uint32(product.Quantity)
 	}
 	cart.Totals.Tax = float64(cart.Totals.Subtotal) * cart.StoreTaxRate / 100.00
-	cart.Totals.Total = cart.Totals.Tax + float64(cart.Totals.Subtotal) + float64(cart.DeliveryFee)
+	cart.Totals.Total = cart.Totals.Tax + float64(cart.Totals.Subtotal)
+	if cart.ApplyFee {
+		cart.Totals.Total = float64(cart.DeliveryFee)
+	}
+}
+
+func FormatPriceCents(n int64) string {
+	in := strconv.FormatInt(n, 10)
+	neg := false
+	out := make([]byte, len(in)+(len(in)-2+int(in[0]/'0'))/3)
+	if in[0] == '-' {
+		in, neg = in[1:], true
+	}
+	if len(in) == 1 {
+		return "$" + string(out) + "0.0" + in
+	}
+	if len(in) == 2 {
+		return "$" + string(out) + "0." + in
+	}
+	cents := in[len(in)-2:]
+	in = in[:len(in)-2]
+	for i, j, k := len(in)-1, len(out)-1, 0; ; i, j = i-1, j-1 {
+		out[j] = in[i]
+		if i == 0 {
+			break
+		}
+		if k++; k == 3 {
+			j, k = j-1, 0
+			out[j] = ','
+		}
+	}
+	if neg {
+		return "-$" + string(out) + "." + cents
+	} else {
+		return "$" + string(out) + "." + cents
+	}
+}
+
+func (cart *Cart) GetCartProductsOrderMarkup() string {
+	markup := ""
+	for _, p := range cart.Products {
+		if p.Quantity > 0 {
+			markup += `<br><br>
+			<div class="column-left"><b>` + strconv.Itoa(int(p.Quantity)) + ` </b> x </b></div>
+			<div class="column-center" align="left">` + p.ProductTitle + `</div>
+			<div class="column-right">` + FormatPriceCents(int64(p.PriceCents)) + `</div>`
+		}
+	}
+	return markup
 }
 
 func (cart *Cart) UpdateProductQuantity(id bson.ObjectId, instructions string, quantity uint16) error {
@@ -172,9 +248,33 @@ func (cart *Cart) RetrieveUserCartsByStatus() ([]Cart, error) {
 	return carts, err
 }
 
-func (cart *Cart) ActiveUserCartCountForStore() (int, error) {
+func (cart *Cart) GetCartsById() error {
 	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
-	return c.Find(bson.M{
+
+	if err := c.Find(bson.M{
+		"_id": cart.ID,
+	}).One(cart); err != nil {
+		return err
+	}
+	cart.UpdateCartTotals()
+	return nil
+}
+
+func (cart *Cart) GetActiveCartsById() error {
+	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
+
+	if err := c.Find(bson.M{
+		"_id":        cart.ID,
+		"cart_state": CartStates["ACTIVE"],
+	}).One(cart); err != nil {
+		return err
+	}
+	cart.UpdateCartTotals()
+	return nil
+}
+
+func (cart *Cart) ActiveUserCartCountForStore() (int, error) {
+	return cart.DB.C(CartCollectionName).With(cart.DBSession).Find(bson.M{
 		"user_id":    cart.UserID,
 		"store_id":   cart.StoreID,
 		"cart_state": CartStates["ACTIVE"],
@@ -182,6 +282,10 @@ func (cart *Cart) ActiveUserCartCountForStore() (int, error) {
 }
 
 func (cart *Cart) ReActivateCart() error {
+	// copy vars here so theyre not overriden on fetch (need better abstraction; ok for now)
+	db := cart.DB
+	sess := cart.DBSession
+
 	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
 	c.Find(bson.M{
 		"_id":        cart.ID,
@@ -193,6 +297,7 @@ func (cart *Cart) ReActivateCart() error {
 			"The cart you have selected is either empty or could not be found",
 		)
 	}
+	cart.DB, cart.DBSession = db, sess
 	if cartCount, countErr := cart.ActiveUserCartCountForStore(); countErr != nil {
 		return countErr
 	} else if cartCount != 0 {
