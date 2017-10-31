@@ -47,20 +47,6 @@ func GetStoreById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 	json.NewEncoder(w).Encode(store)
 }
 
-func GetFullStoreById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	var store models.Store
-	store.DB = db.Database
-	store.DBSession = store.DB.Session.Copy()
-	defer store.DBSession.Close()
-
-	err, resp := store.RetrieveFullStoreByID(ps.ByName("store_id"))
-	if err != nil {
-		models.WriteNewError(w, err)
-		return
-	}
-	json.NewEncoder(w).Encode(resp)
-}
-
 func StoreCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var store models.Store
 	store.DB = db.Database
@@ -141,3 +127,19 @@ func StoreInfoUpdate(w http.ResponseWriter, r *http.Request, ps httprouter.Param
 	}
 	json.NewEncoder(w).Encode(store)
 }
+
+/*
+func GetFullStoreById(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var store models.Store
+	store.DB = db.Database
+	store.DBSession = store.DB.Session.Copy()
+	defer store.DBSession.Close()
+
+	err, resp := store.RetrieveFullStoreByID(ps.ByName("store_id"))
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(resp)
+}
+*/

@@ -5,10 +5,21 @@ import (
 	"reflect"
 )
 
+var (
+	DOMAIN      = ""
+	UI_DIR_PATH = ""
+)
+
 type Email struct {
 	To      string
 	Body    string
 	Subject string
+}
+
+type EmailReq struct {
+	To      string `json:"to" validate:"required"`
+	Body    string `json:"body" validate:"required"`
+	Subject string `json:"subject" validate:"required"`
 }
 
 type GeoJson struct {

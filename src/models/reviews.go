@@ -20,8 +20,6 @@ const (
 	PageSize       = 100
 )
 
-//var ReviewTypes = []string{PlatformReview, ProductReview, StoreReview, OrderReview}
-
 type Review struct {
 	ID         bson.ObjectId `bson:"_id" json:"id"`
 	ReviewedOn time.Time     `bson:"reviewed_on" json:"reviewed_on"`

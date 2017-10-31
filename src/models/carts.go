@@ -18,11 +18,13 @@ var CartStates = map[string]int{
 }
 
 type Totals struct {
-	Subtotal uint32  `bson:"-" json:"subtotal"`
-	CashTip  bool    `bson:"cash_tip" json:"cash_tip"`
-	Total    float64 `bson:"-" json:"total"`
-	Tax      float64 `bson:"-" json:"tax"`
-	Tip      uint32  `bson:"tip" json:"tip"`
+	DeliveryTotal float64 `bson:"-" json:"delivery_total"`
+	PickupTotal   float64 `bson:"-" json:"pickup_total"`
+	Subtotal      uint32  `bson:"-" json:"subtotal"`
+	CashTip       bool    `bson:"cash_tip" json:"cash_tip"`
+	Total         float64 `bson:"-" json:"total"`
+	Tax           float64 `bson:"-" json:"tax"`
+	Tip           uint32  `bson:"tip" json:"tip"`
 }
 
 type Cart struct {
@@ -33,14 +35,22 @@ type Cart struct {
 	Products     []CartProduct `bson:"products" json:"products"`
 	StoreName    string        `bson:"store_name" json:"store_name"`
 	CartState    int           `bson:"cart_state" json:"cart_state"`
+	ItemCount    uint16        `bson:"-" json:"item_count"`
 	DateCreated  time.Time     `bson:"created_at" json:"created_at"`
 	LastUpdated  time.Time     `bson:"last_updated" json:"last_updated"`
 	DeliveryFee  uint32        `bson:"delivery_fee" json:"delivery_fee"`
 	StoreTaxRate float64       `bson:"tax_rate" json:"tax_rate"`
 
 	//StoreInfo Store `bson:"-" json:"-"`
-	IsNew    bool `bson:"-" json:"-"`
-	ApplyFee bool `bson:"-" json:"-"`
+	Store    Store `bson:"-" json:"-"`
+	IsNew    bool  `bson:"-" json:"-"`
+	ApplyFee bool  `bson:"-" json:"-"`
+	Flags    struct {
+		CCAccepted      bool `bson:"-" json:"cc_accepted"`
+		CashAccepted    bool `bson:"-" json:"cash_accepted"`
+		IsValidPickup   bool `bson:"-" json:"is_valid_pickup"`
+		IsValidDelivery bool `bson:"-" json:"is_valid_delivery"`
+	} `bson:"-" json:"flags"`
 
 	DB        *mgo.Database `bson:"-" json:"-"`
 	DBSession *mgo.Session  `bson:"-" json:"-"`
@@ -160,12 +170,39 @@ func (cart *Cart) CompleteCart() error {
 func (cart *Cart) UpdateCartTotals() {
 	for _, product := range cart.Products {
 		cart.Totals.Subtotal += product.PriceCents * uint32(product.Quantity)
+		cart.ItemCount += product.Quantity
 	}
 	cart.Totals.Tax = float64(cart.Totals.Subtotal) * cart.StoreTaxRate / 100.00
-	cart.Totals.Total = cart.Totals.Tax + float64(cart.Totals.Subtotal)
+	cart.Totals.PickupTotal = cart.Totals.Tax + float64(cart.Totals.Subtotal)
+	cart.Totals.DeliveryTotal = cart.Totals.PickupTotal + float64(cart.DeliveryFee)
 	if cart.ApplyFee {
-		cart.Totals.Total = float64(cart.DeliveryFee)
+		cart.Totals.Total = cart.Totals.DeliveryTotal
+	} else {
+		cart.Totals.Total = cart.Totals.PickupTotal
 	}
+}
+
+func (cart *Cart) CartFlags() error {
+	if cart.Store.ID.Hex() == "" {
+		cart.Store.DB = cart.DB
+		cart.Store.ID = cart.StoreID
+		cart.Store.DBSession = cart.DBSession
+		if err := cart.Store.RetrieveStoreByOID(); err != nil {
+			return err
+		}
+	}
+	cart.Flags.CashAccepted = cart.Store.PaymentDetails.AcceptsCashPayment
+	cart.Flags.CCAccepted = cart.Store.PaymentDetails.AcceptsCCPayment
+	if cart.Store.Pickup.Offered && uint16(cart.Store.Pickup.PickupItemCount.Min) <= cart.ItemCount {
+		cart.Flags.IsValidPickup = true
+	}
+	if cart.Store.Delivery.Offered && uint32(cart.Store.Delivery.MinAmount) <= cart.Totals.Subtotal {
+		cart.Flags.IsValidDelivery = true
+	}
+	return nil
+	// if o.Store.StorePickup.PickupItemCount.Max < o.Cart.ItemCount {
+	//	return errors.New("You do not meet the minium number of items required by the store.")
+	// }
 }
 
 func FormatPriceCents(n int64) string {
@@ -215,6 +252,7 @@ func (cart *Cart) GetCartProductsOrderMarkup() string {
 
 func (cart *Cart) UpdateProductQuantity(id bson.ObjectId, instructions string, quantity uint16) error {
 	p_collection := cart.DB.C(ProductCollectionName).With(cart.DBSession)
+	db, sess := cart.DB, cart.DBSession
 	var p CartProduct
 	pQuery := bson.M{
 		"_id":      id,
@@ -231,11 +269,14 @@ func (cart *Cart) UpdateProductQuantity(id bson.ObjectId, instructions string, q
 		return err
 	}
 	cart.UpdateCartTotals()
+	cart.DB, cart.DBSession = db, sess
+	cart.CartFlags()
 	return nil
 }
 
 func (cart *Cart) RetrieveUserCartsByStatus() ([]Cart, error) {
 	c := cart.DB.C(CartCollectionName).With(cart.DBSession)
+	db, sess := cart.DB, cart.DBSession
 
 	carts := []Cart{}
 	err := c.Find(bson.M{
@@ -244,6 +285,8 @@ func (cart *Cart) RetrieveUserCartsByStatus() ([]Cart, error) {
 	}).All(&carts)
 	for cartIndex, _ := range carts {
 		carts[cartIndex].UpdateCartTotals()
+		carts[cartIndex].DB, carts[cartIndex].DBSession = db, sess
+		carts[cartIndex].CartFlags()
 	}
 	return carts, err
 }
@@ -279,6 +322,13 @@ func (cart *Cart) ActiveUserCartCountForStore() (int, error) {
 		"store_id":   cart.StoreID,
 		"cart_state": CartStates["ACTIVE"],
 	}).Count()
+}
+
+func (cart *Cart) RetrieveStoreCartByID() error {
+	return cart.DB.C(CartCollectionName).With(cart.DBSession).Find(bson.M{
+		"_id":      cart.ID,
+		"store_id": cart.StoreID,
+	}).One(cart)
 }
 
 func (cart *Cart) ReActivateCart() error {

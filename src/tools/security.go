@@ -34,7 +34,6 @@ func SecureRandomBytes(length int) []byte {
 }
 
 func SecureRandomString(availableCharBytes string, length int) string {
-
 	// Compute bitMask
 	availableCharLength := len(availableCharBytes)
 	if availableCharLength == 0 || availableCharLength > 256 {

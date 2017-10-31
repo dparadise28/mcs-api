@@ -10,10 +10,10 @@ var CategoryIndex = []mgo.Index{
 	// http://bazaar.launchpad.net/+branch/mgo/v2/view/head:/session.go#L889
 	mgo.Index{
 		Key: []string{
-			"name",
-			"store_id",
+			"root",
+			"template_category_id",
 		},
-		Unique:     false,
+		Unique:     true,
 		DropDups:   true,
 		Background: true,
 		Sparse:     true,

@@ -4,10 +4,14 @@ import (
 	//"github.com/didip/tollbooth"
 	//"github.com/didip/tollbooth/thirdparty/tollbooth_httprouter"
 	//"reflect"
+	"github.com/NYTimes/gziphandler"
 	"github.com/julienschmidt/httprouter"
 	"log"
 	"models"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -97,5 +101,22 @@ func ServeEndPoints() *httprouter.Router {
 			generateAPIEndPoint(handler_method, fullEndPoint),
 		)
 	}
+	router.NotFound = gziphandler.GzipHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		urlPath := strings.Split(r.URL.String(), "by_id/")
+		r2 := new(http.Request)
+		*r2 = *r
+		r2.URL = new(url.URL)
+		*r2.URL = *r.URL
+		r2.URL.Path = urlPath[len(urlPath)-1]
+		if _, err := os.Stat(models.UI_DIR_PATH + r2.URL.Path); os.IsNotExist(err) {
+			urlPath = strings.Split(r2.URL.Path, "admin/")
+			r2.URL.Path = urlPath[len(urlPath)-1]
+			if _, err := os.Stat(models.UI_DIR_PATH + r2.URL.Path); os.IsNotExist(err) {
+				r2.URL.Path = ""
+			}
+		}
+		log.Println(r2.URL.String())
+		http.FileServer(http.Dir(models.UI_DIR_PATH)).ServeHTTP(w, r2)
+	}))
 	return router
 }

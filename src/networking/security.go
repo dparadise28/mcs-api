@@ -20,7 +20,7 @@ func SetBaseHeaders(respWrtr http.ResponseWriter, req *http.Request) {
 	respWrtr.Header().Set("Access-Control-Allow-Credentials", "true")
 	respWrtr.Header().Set(
 		"Access-Control-Allow-Headers",
-		"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Requested-With, userID, authtoken",
+		"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Requested-With, userID, authtoken, storeID",
 	)
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{req.Header.Get("Origin")},
@@ -46,8 +46,12 @@ func ValidatedToken(w http.ResponseWriter, r *http.Request, ps hr.Params, ep str
 						return false, models.ErrUnconfirmedUser
 					}
 				} else {
-					if ps.ByName("store_id") != "" {
-						perms, found := claims.Perms[ps.ByName("store_id")]
+					storeID := r.Header.Get(models.STOREID_HEADER_NAME)
+					if storeID == "" {
+						storeID = ps.ByName("store_id")
+					}
+					if storeID != "" {
+						perms, found := claims.Perms[storeID]
 						if !found || !strings.Contains(perms, accessRole) {
 							log.Println("unauthorize request!")
 							return false, models.ErrUnauthorizedAccess

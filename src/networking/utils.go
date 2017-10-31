@@ -19,7 +19,7 @@ func RedirectTarget(w http.ResponseWriter, req *http.Request, target string) {
 */
 func LogExtIp(port string) {
 	// lets log our external ip for easy access
-	resp, err := http.Get("http://myexternalip.com/raw")
+	resp, err := http.Get("http://api.ipify.org")
 	if err == nil {
 		extip, extipErr := ioutil.ReadAll(resp.Body)
 		if extipErr == nil {

@@ -14,6 +14,7 @@ import (
 var OrderCollectionName = "Orders"
 
 type CashPickupOrderRequest struct {
+	Phone            string        `bson:"phone" json:"phone"`
 	CartID           bson.ObjectId `bson:"cart_id" json:"cart_id" validate:"required"`
 	StoreID          bson.ObjectId `bson:"store_id" json:"store_id" validate:"required"`
 	UserInstructions string        `bson:"instructions" json:"instructions"`
@@ -28,6 +29,7 @@ type CashDeliveryOrderRequest struct {
 
 type CCPickupOrderRequest struct {
 	Tip              uint          `bson:"tip" json:"tip"`
+	Phone            string        `bson:"phone" json:"phone"`
 	CardID           string        `bson:"card_id" json:"card_id"`
 	CartID           bson.ObjectId `bson:"cart_id" json:"cart_id" validate:"required"`
 	StoreID          bson.ObjectId `bson:"store_id" json:"store_id" validate:"required"`
@@ -80,6 +82,7 @@ type Order struct {
 	StoreID            bson.ObjectId    `bson:"store_id" json:"store_id"`
 	ChargeID           string           `bson:"charge_id" json:"charge_id"`
 	RefundID           string           `bson:"refund_id" json:"refurn_id"`
+	StoreName          string           `bson:"store_name" json:"store_name"`
 	StatusLog          []OrderStatusLog `bson:"status_log" json:"status_log"`
 	CreatedAt          time.Time        `bson:"created_at" json:"created_at"`
 	OrderType          string           `bson:"order_type" json:"order_type"`
@@ -115,11 +118,47 @@ func (o *Order) ExpandOrderInfo() error {
 	if err := o.Store.RetrieveStoreByOID(); err != nil {
 		return err
 	}
+	o.StoreName = o.Store.Name
 
 	o.Cart.DB = o.DB
 	o.Cart.DBSession = o.DBSession
 	if err := o.Cart.GetActiveCartsById(); err != nil {
 		return err
+	}
+	if o.PaymentMethod == CC && !o.Store.PaymentDetails.AcceptsCCPayment {
+		return errors.New("This store does not offer credit card purchases.")
+	}
+	if o.PaymentMethod == CASH && !o.Store.PaymentDetails.AcceptsCashPayment {
+		return errors.New("This store does not offer cash purchases.")
+	}
+	o.Cart.Store = o.Store
+	if err := o.Cart.CartFlags(); err != nil {
+		return err
+	}
+	if !o.Cart.Flags.IsValidPickup && o.OrderType == PICKUP {
+		return errors.New(
+			"Please make sure your cart meets the pickup " +
+				"requirements and the store accepts pickup orders.",
+		)
+	} else if o.OrderType == DELIVERY {
+		if !o.Cart.Flags.IsValidDelivery {
+			return errors.New(
+				"Please make sure your cart meets the delivery " +
+					"requirements and the store accepts delivery orders.",
+			)
+		}
+		if float64(o.Store.Delivery.MaxDist) < Distance(
+			o.Store.Address.Latitude,
+			o.Store.Address.Longitude,
+			o.Address.Latitude,
+			o.Address.Longitude,
+		) {
+			return errors.New(
+				"Unfortunately we do not deliver to your neighborhood at " +
+					"this time but we would love to have you drop by and " +
+					"pickup your items.",
+			)
+		}
 	}
 	return nil
 }
@@ -133,7 +172,7 @@ func (o *Order) InsertOrder() error {
 		OrderStatusLog{
 			Status: o.OrderStatus,
 			Date:   o.CreatedAt,
-			Msg:    "Your order is currently being reviwed by the store.",
+			Msg:    OrderStatusMsgs[o.OrderStatus],
 		},
 	}
 	return c.Insert(&o)
@@ -169,6 +208,10 @@ func (o *Order) DoExternalUpdatesForNewStatus(status *OrderStatusUpdate) (error,
 			}
 		}
 	}
+	destEmail := o.DestinationEmail
+	if status.Message == "" || status.Message == "yay" || status.Message == status.NewStatus {
+		status.Message = OrderStatusMsgs[status.NewStatus]
+	}
 	c := o.DB.C(OrderCollectionName).With(o.DBSession)
 	_, err := c.Find(bson.M{
 		"_id": o.ID,
@@ -190,6 +233,7 @@ func (o *Order) DoExternalUpdatesForNewStatus(status *OrderStatusUpdate) (error,
 			},
 		},
 	}, o)
+	o.DestinationEmail = destEmail
 	return err, o.CompletedEmail()
 }
 

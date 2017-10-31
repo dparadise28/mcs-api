@@ -37,6 +37,7 @@ func PayWithCashForPickup(w http.ResponseWriter, r *http.Request, ps httprouter.
 	order.UserID = bson.ObjectIdHex(r.Header.Get(models.USERID_COOKIE_NAME))
 	order.CartID = orderRequest.CartID
 	order.StoreID = orderRequest.StoreID
+	order.Address.Phone = orderRequest.Phone
 	order.UserInstructions = orderRequest.UserInstructions
 	order.PaymentMethod, order.OrderType = models.CASH, models.PICKUP
 	order.DB = db.Database
@@ -63,6 +64,7 @@ func PayWithCashForPickup(w http.ResponseWriter, r *http.Request, ps httprouter.
 
 	tools.EmailQueue <- &userEmail
 	tools.EmailQueue <- &storeEmail
+	go tools.SendToSlack("notifications", "cash pickup.", order.ID.Hex())
 	json.NewEncoder(w).Encode(order)
 }
 
@@ -113,6 +115,7 @@ func PayWithCashForDelivery(w http.ResponseWriter, r *http.Request, ps httproute
 
 	tools.EmailQueue <- &userEmail
 	tools.EmailQueue <- &storeEmail
+	go tools.SendToSlack("notifications", "cash delivery.", order.ID.Hex())
 	json.NewEncoder(w).Encode(order)
 }
 
@@ -133,6 +136,7 @@ func PayWithCCForPickup(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 	order.CartID = orderRequest.CartID
 	order.CardID = orderRequest.CardID
 	order.StoreID = orderRequest.StoreID
+	order.Address.Phone = orderRequest.Phone
 	order.UserInstructions = orderRequest.UserInstructions
 	order.PaymentMethod, order.OrderType = models.CC, models.PICKUP
 	order.DB = db.Database
@@ -207,6 +211,7 @@ func PayWithCCForPickup(w http.ResponseWriter, r *http.Request, ps httprouter.Pa
 
 	tools.EmailQueue <- &userEmail
 	tools.EmailQueue <- &storeEmail
+	go tools.SendToSlack("notifications", "cc pickup! Fuck yeah!", order.ID.Hex())
 	json.NewEncoder(w).Encode(order)
 }
 
@@ -302,6 +307,7 @@ func PayWithCCForDelivery(w http.ResponseWriter, r *http.Request, ps httprouter.
 	tools.EmailQueue <- &userEmail
 	tools.EmailQueue <- &storeEmail
 	json.NewEncoder(w).Encode(order)
+	go tools.SendToSlack("notifications", "cc delivery! Fuck yeah!", order.ID.Hex())
 }
 
 func GetActiveStoreOrders(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -385,6 +391,15 @@ func UpdateOrderStatus(w http.ResponseWriter, r *http.Request, ps httprouter.Par
 		models.WriteNewError(w, err)
 		return
 	}
-	tools.EmailQueue <- &email
 	json.NewEncoder(w).Encode(order)
+	if order.OrderStatus == models.CANCELED ||
+		order.OrderStatus == models.REJECTED ||
+		order.OrderStatus == models.COMPLETED {
+		tools.EmailQueue <- &email
+		go tools.SendToSlack(
+			"notifications",
+			"status updated to "+order.OrderStatus,
+			order.ID.Hex(),
+		)
+	}
 }

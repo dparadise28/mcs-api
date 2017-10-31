@@ -1,14 +1,22 @@
 package networking
 
 import (
-	"fmt"
-	//"log"
 	"encoding/json"
+	"fmt"
 	"github.com/julienschmidt/httprouter"
+	"log"
 	"net/http"
+	"sync"
 )
 
+var mutex sync.Mutex
+
 func Info(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	InfoHandler(w, r)
+}
+
+func InfoHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Still alive mother fucker!")
 	fmt.Fprintf(w, "Method: %s\n", r.Method)
 	fmt.Fprintf(w, "Protocol: %s\n", r.Proto)
 	fmt.Fprintf(w, "Host: %s\n", r.Host)
@@ -23,6 +31,8 @@ func Info(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 }
 
 func Docs(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	mutex.Lock()
+	defer mutex.Unlock()
 	routeDoc := make([]map[string]map[string]interface{}, len(APIRouteList))
 	for index, route := range APIRouteList {
 		for routeEndPoint, routeSpecs := range route {

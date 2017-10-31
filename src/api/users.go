@@ -60,7 +60,11 @@ func UserConfirmation(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 
 	// ::TODO:: dynamic external routing for things like this
 	log.Println("redirecting")
-	http.Redirect(w, r, "http://mycorner.store:8003/#/login", http.StatusTemporaryRedirect)
+	schema := "http"
+	if r.TLS == nil {
+		schema = "https"
+	}
+	http.Redirect(w, r, schema+"://"+models.DOMAIN+"/#/login", http.StatusTemporaryRedirect)
 	return
 }
 

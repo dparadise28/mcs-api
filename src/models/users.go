@@ -73,7 +73,7 @@ func (u *User) AddUserStripeCustomerAccount() error {
 }
 
 func (u *User) ConfirmUserEmailLink(pw_reset bool) string {
-	link := "http://mycorner.store:8080/api/user/confirm/email/" + u.ID.Hex() + "/" + u.ConfirmationCode
+	link := DOMAIN + "/api/user/confirm/email/" + u.ID.Hex() + "/" + u.ConfirmationCode
 	if pw_reset {
 		link += "?password=" + u.Password
 	}

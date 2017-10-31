@@ -115,7 +115,7 @@ func (o *Order) UserOrderConfirmationEmail(storeConfirmation bool) Email {
 												<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-spacing:0px;" align="center" border="0">
 													<tbody>
 														<tr>
-                              <td style="width: 60%;"><a href="about:blank" target="_blank"><img alt="auth0" title="" height="auto" src="http://mycorner.store:8003/img/fulllogo.00df53e.png" style="border:none;border-radius:;display:block;outline:none;text-decoration:none;width:100%;height:auto;" width="60%"></a></td>
+                              <td style="width: 60%;"><a href="about:blank" target="_blank"><img alt="auth0" title="" height="auto" src="` + DOMAIN + `/img/fulllogo.00df53e.png" style="border:none;border-radius:;display:block;outline:none;text-decoration:none;width:100%;height:auto;" width="60%"></a></td>
 														</tr>
 													</tbody>
 												</table>

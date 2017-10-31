@@ -8,6 +8,15 @@ import (
 var AssetIndex = []mgo.Index{
 	mgo.Index{
 		Key: []string{
+			"template_category_id",
+		},
+		Unique:     false,
+		DropDups:   true,
+		Background: true,
+		Sparse:     true,
+	},
+	mgo.Index{
+		Key: []string{
 			"$text:title",
 		},
 		Unique:     false,

@@ -9,6 +9,7 @@ import (
 	"log"
 	"models"
 	"net/http"
+	"strconv"
 	"tools"
 )
 
@@ -33,6 +34,15 @@ func AddReview(w http.ResponseWriter, r *http.Request, ps httprouter.Params, rev
 		log.Println(err)
 		models.WriteNewError(w, err)
 		return
+	}
+	if review.ReviewFor == models.PlatformReview {
+		go tools.SendToSlack(
+			"support",
+			"comment: "+review.Comment,
+			"["+review.UserId.Hex()+
+				"]["+review.Username+
+				"][rating="+strconv.Itoa(int(review.Score))+"]",
+		)
 	}
 	json.NewEncoder(w).Encode(review)
 }

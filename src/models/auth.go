@@ -9,6 +9,8 @@ import (
 )
 
 // perm keys for read write record privelages
+var JWT_SIGNATURE = ""
+
 const (
 	ACCESSROLE_OrdersReadWritePerm  = "o_rw"
 	ACCESSROLE_OrdersReadPerm       = "o_r"
@@ -24,12 +26,12 @@ const (
 
 	UNCONFIRMED_USER = "Unconfirmed User"
 
-	JWT_SIGNATURE = "temp_signiture_key"
-	JWT_ISSUER    = "MCS-API"
+	JWT_ISSUER = "MCS-API"
 
-	JWT_COOKIE_NAME    = "authtoken"
-	USERID_COOKIE_NAME = "userID"
-	USERID_HEADER_NAME = USERID_COOKIE_NAME
+	JWT_COOKIE_NAME     = "authtoken"
+	USERID_COOKIE_NAME  = "userID"
+	USERID_HEADER_NAME  = USERID_COOKIE_NAME
+	STOREID_HEADER_NAME = "storeID"
 )
 
 func JWT_TTL() int64 {

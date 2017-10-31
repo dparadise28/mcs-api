@@ -122,3 +122,18 @@ func ReActiveUserCart(w http.ResponseWriter, r *http.Request, ps httprouter.Para
 	}
 	json.NewEncoder(w).Encode(cart)
 }
+
+func RetrieveStoreCartByID(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var cart models.Cart
+	cart.DB = db.Database
+	cart.DBSession = cart.DB.Session.Copy()
+	defer cart.DBSession.Close()
+
+	cart.ID = bson.ObjectIdHex(ps.ByName("cart_id"))
+	cart.StoreID = bson.ObjectIdHex(r.Header.Get(models.STOREID_HEADER_NAME))
+	if err := cart.RetrieveStoreCartByID(); err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(cart)
+}

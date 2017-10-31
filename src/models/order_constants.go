@@ -91,12 +91,12 @@ var (
 				CANCELED,
 			},
 			EN_ROUTE: []string{
-				CANCELED,
 				COMPLETED,
+				CANCELED,
 			},
 			APPROVED: []string{
-				CANCELED,
 				IN_PROGRESS,
+				CANCELED,
 			},
 			PENDING: []string{
 				APPROVED,
@@ -108,12 +108,12 @@ var (
 			COMPLETED: []string{},
 			REJECTED:  []string{},
 			IN_PROGRESS: []string{
-				CANCELED,
 				COMPLETED,
+				CANCELED,
 			},
 			APPROVED: []string{
-				CANCELED,
 				IN_PROGRESS,
+				CANCELED,
 			},
 			PENDING: []string{
 				APPROVED,
@@ -158,5 +158,15 @@ var (
 			APPROVED:    APPROVED,
 			PENDING:     PENDING,
 		},
+	}
+
+	OrderStatusMsgs = map[string]string{
+		CANCELED:    "We regret to inform you that your order has been canceled.",
+		IN_PROGRESS: "Your order is in the works!",
+		COMPLETED:   "Your order has been completed! Thank you for shopping with us and we hope to see you again soon!",
+		REJECTED:    "We regret to inform you that your order could not be accepted at this time.",
+		EN_ROUTE:    "Your order is on it's way!",
+		APPROVED:    "Thank you for shopping with us! We would be glad to fulfill your order.",
+		PENDING:     "Your order is currently being reviwed by the store.",
 	}
 )

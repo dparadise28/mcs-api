@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"log"
 	//"time"
 	mgo "gopkg.in/mgo.v2"
@@ -19,7 +18,7 @@ var (
 
 func InitSession() {
 	// We need this object to establish a session to our MongoDB.
-	fmt.Println("setting mongo session")
+	log.Println("setting mongo session")
 	session, err := mgo.Dial(MongoDBUri)
 	if err != nil {
 		log.Fatalf("CreateSession: %s\n", err)

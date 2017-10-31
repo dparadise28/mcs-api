@@ -4,54 +4,158 @@ import (
 	"db"
 	"encoding/json"
 	"github.com/julienschmidt/httprouter"
+	"gopkg.in/mgo.v2/bson"
+	// "log"
 	"models"
 	"net/http"
 	"tools"
 )
 
-func GetCategoriesByStoreId(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	var category models.Category
-	category.DB = db.Database
-	category.DBSession = category.DB.Session.Copy()
-	defer category.DBSession.Close()
+/*------------------template manipulation retrieval--------------------*/
 
-	enabled_only_categories := true
-	enabled_only_products := true
-	if r.URL.Query().Get("include_disabled_categories") == "true" {
-		enabled_only_categories = false
-	}
-	if r.URL.Query().Get("include_disabled_products") == "true" {
-		enabled_only_products = false
-	}
-	_, resp := category.RetrieveFullCategoriesByStoreID(
-		ps.ByName("store_id"),
-		enabled_only_categories,
-		enabled_only_products,
-	)
-	json.NewEncoder(w).Encode(resp)
-}
-
-func AddStoreCategory(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	var category models.Category
-
+func AddStoreTemplateCategories(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var reqCats []models.StoreCategory
 	v := new(tools.DefaultValidator)
-	if err := json.NewDecoder(r.Body).Decode(&category); err != nil {
-		models.WriteError(w, models.ErrBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&reqCats); err != nil {
+		models.WriteNewError(w, err)
 		return
 	}
-	if validationErr := v.ValidateIncomingJsonRequest(&category); validationErr.Status != 200 {
+	if validationErr := v.ValidateIncomingJsonRequest(&reqCats); validationErr.Status != 200 {
 		models.WriteError(w, &validationErr)
 		return
 	}
+
+	var category models.Category
 	category.DB = db.Database
 	category.DBSession = category.DB.Session.Copy()
 	defer category.DBSession.Close()
-	if err := category.AddStoreCategory(); err != nil {
-		models.WriteError(w, models.ErrBadRequest)
+	root := bson.NewObjectId()
+	err, categories := category.AddStoreCategories(
+		reqCats,
+		root, // bson.ObjectIdHex(r.Header.Get(models.STOREID_HEADER_NAME)),
+		true,
+	)
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
 	}
-	json.NewEncoder(w).Encode(category)
+	json.NewEncoder(w).Encode(categories)
 }
 
+func RetrieveTier1StoreTemplateCategories(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var category models.Category
+	category.DB = db.Database
+	category.DBSession = category.DB.Session.Copy()
+	defer category.DBSession.Close()
+	categories := category.FindStoreTemplateTier1Categories()
+	// bson.ObjectIdHex(r.Header.Get(models.STOREID_HEADER_NAME)),
+	json.NewEncoder(w).Encode(categories)
+}
+
+func RetrieveTier2StoreTemplateCategories(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var category models.Category
+	category.DB = db.Database
+	category.DBSession = category.DB.Session.Copy()
+	defer category.DBSession.Close()
+	categories := category.FindStoreTemplateTier2Categories(
+		bson.ObjectIdHex(r.URL.Query().Get("category_id")),
+		// bson.ObjectIdHex(r.Header.Get(models.STOREID_HEADER_NAME)),
+	)
+	json.NewEncoder(w).Encode(categories)
+}
+
+func AddStoreCategories(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var categories models.StoreCategoryIds
+
+	v := new(tools.DefaultValidator)
+	if err := json.NewDecoder(r.Body).Decode(&categories); err != nil {
+		models.WriteError(w, models.ErrBadRequest)
+		return
+	}
+	if validationErr := v.ValidateIncomingJsonRequest(&categories); validationErr.Status != 200 {
+		models.WriteError(w, &validationErr)
+		return
+	}
+	categories.DB = db.Database
+	categories.DBSession = categories.DB.Session.Copy()
+	defer categories.DBSession.Close()
+	if err := categories.AddStoreCategories(bson.ObjectIdHex(r.Header.Get(models.STOREID_HEADER_NAME))); err != nil {
+		models.WriteError(w, models.ErrBadRequest)
+	}
+	json.NewEncoder(w).Encode(categories)
+}
+
+// ----------------------------------------------------------------------*/
+/*
+func AddStoreCategoriesFromTemplate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	var reqCats []models.Category
+	v := new(tools.DefaultValidator)
+	if err := json.NewDecoder(r.Body).Decode(&reqCats); err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
+	if validationErr := v.ValidateIncomingJsonRequest(&reqCats); validationErr.Status != 200 {
+		models.WriteError(w, &validationErr)
+		return
+	}
+
+	var category models.Category
+	category.DB = db.Database
+	category.DBSession = category.DB.Session.Copy()
+	defer category.DBSession.Close()
+	err, categories := category.AddStoreCategoriesFromTemplate(
+		reqCats,
+		bson.ObjectIdHex(r.Header.Get(models.STOREID_HEADER_NAME)),
+	)
+	if err != nil {
+		models.WriteNewError(w, err)
+		return
+	}
+	json.NewEncoder(w).Encode(categories)
+}
+
+func RetrieveEnabledTier1StoreCategories(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	RetrieveTier1StoreCategories(w, r, ps, true)
+}
+
+func RetrieveDisabledTier1StoreCategories(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	RetrieveTier1StoreCategories(w, r, ps, false)
+}
+
+func RetrieveTier1StoreCategories(w http.ResponseWriter, r *http.Request, ps httprouter.Params, enabled bool) {
+	var category models.Category
+	category.DB = db.Database
+	category.DBSession = category.DB.Session.Copy()
+	defer category.DBSession.Close()
+	categories := category.FindStoreTier1Categories(
+		bson.ObjectIdHex(r.Header.Get(models.STOREID_HEADER_NAME)), enabled,
+	)
+	json.NewEncoder(w).Encode(categories)
+}
+
+func RetrieveEnabledTier2StoreCategories(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	RetrieveTier2StoreCategories(w, r, ps, true)
+}
+
+func RetrieveDisabledTier2StoreCategories(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	RetrieveTier2StoreCategories(w, r, ps, false)
+}
+
+func RetrieveTier2StoreCategories(w http.ResponseWriter, r *http.Request, ps httprouter.Params, enabled bool) {
+	var category models.Category
+	category.DB = db.Database
+	category.DBSession = category.DB.Session.Copy()
+	defer category.DBSession.Close()
+	categories := category.FindStoreTemplateTier2Categories(
+		enabled,
+		bson.ObjectIdHex(r.URL.Query().Get("category_id")),
+		bson.ObjectIdHex(r.Header.Get(models.STOREID_HEADER_NAME)),
+	)
+	json.NewEncoder(w).Encode(categories)
+}
+*/
+
+/*
 func UpdateStoreCategory(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	var category models.Category
 
@@ -114,3 +218,4 @@ func ReorderStoreCategories(w http.ResponseWriter, r *http.Request, ps httproute
 	}
 	json.NewEncoder(w).Encode(order)
 }
+*/

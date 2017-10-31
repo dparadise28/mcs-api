@@ -12,6 +12,7 @@ var ProductCollectionName = "Products"
 
 type Product struct {
 	ID             bson.ObjectId `bson:"_id" json:"product_id"`
+	Size           string        `bson:"size" json:"size"`
 	Image          string        `bson:"image" json:"image" validate:"required"`
 	AssetID        bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
 	Enabled        bool          `bson:"enabled" json:"enabled"`
@@ -19,7 +20,6 @@ type Product struct {
 	SortOrder      uint16        `bson:"sort_order" json:"sort_order"`
 	PriceCents     uint32        `bson:"price_cents" json:"price_cents" validate:"required"`
 	CategoryID     bson.ObjectId `bson:"category_id" json:"category_id"`
-	Description    string        `bson:"desc" json:"description"`
 	ProductTitle   string        `bson:"title" json:"title" validate:"required"`
 	DisplayPrice   string        `bson:"-" json:"display_price"`
 	NewCategoryID  bson.ObjectId `bson:"-" json:"new_category_id"`
@@ -33,15 +33,16 @@ type Product struct {
 }
 
 type ReadOnlyProduct struct {
-	ID             bson.ObjectId `bson:"_id" json:"product_id"`
-	Image          string        `bson:"image" json:"image"`
-	AssetID        bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
-	Enabled        bool          `bson:"enabled" json:"enabled"`
-	StoreID        bson.ObjectId `bson:"store_id" json:"store_id"`
-	SortOrder      uint16        `bson:"sort_order" json:"sort_order"`
-	PriceCents     uint32        `bson:"price_cents" json:"price_cents" validate:"required"`
-	CategoryID     bson.ObjectId `bson:"category_id" json:"category_id"`
-	Description    string        `bson:"desc" json:"description"`
+	ID         bson.ObjectId `bson:"_id" json:"product_id"`
+	Size       string        `bson:"size" json:"size"`
+	Image      string        `bson:"image" json:"image"`
+	AssetID    bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
+	Enabled    bool          `bson:"enabled" json:"enabled"`
+	StoreID    bson.ObjectId `bson:"store_id" json:"store_id"`
+	SortOrder  uint16        `bson:"sort_order" json:"sort_order"`
+	PriceCents uint32        `bson:"price_cents" json:"price_cents" validate:"required"`
+	CategoryID bson.ObjectId `bson:"category_id" json:"category_id"`
+	// Description    string        `bson:"desc" json:"description"`
 	ProductTitle   string        `bson:"title" json:"title" validate:"required"`
 	DisplayPrice   string        `bson:"-" json:"display_price"`
 	NewCategoryID  bson.ObjectId `bson:"-" json:"new_category_id"`
@@ -58,6 +59,7 @@ type ReadOnlyProduct struct {
 type CartProduct struct {
 	//StoreID      bson.ObjectId `bson:"-" json:"store_id"`
 	ID           bson.ObjectId `bson:"_id" json:"product_id"`
+	Size         string        `bson:"size" json:"size"`
 	Image        string        `bson:"image" json:"image" validate:"required"`
 	AssetID      bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
 	Quantity     uint16        `bson:"qty" json:"quantity"`
@@ -127,8 +129,9 @@ func (p *Product) UpdateStoreProduct() {
 		Remove:    false,
 		Update: bson.M{
 			"$set": bson.M{
-				"desc":        p.Description,
+				// "desc":        p.Description,
 				"title":       p.ProductTitle,
+				"size":        p.Size,
 				"price_cents": p.PriceCents,
 				"category_id": p.NewCategoryID,
 			},

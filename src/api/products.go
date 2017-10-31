@@ -90,7 +90,7 @@ func ReorderStoreProducts(w http.ResponseWriter, r *http.Request, ps httprouter.
 	order.DBSession = order.DB.Session.Copy()
 	defer order.DBSession.Close()
 	if err := order.ReorderStoreProducts(); err != nil {
-		models.WriteError(w, models.ErrBadRequest)
+		models.WriteNewError(w, err)
 	}
 	json.NewEncoder(w).Encode(order)
 }

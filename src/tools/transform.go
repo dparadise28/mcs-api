@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -145,12 +146,12 @@ func Remodel(expected []byte, original []byte, action []byte) TransformationTrac
 
 func printJ(JsonMSI map[string]interface{}) {
 	buf, _ := ffjson.Marshal(&JsonMSI)
-	fmt.Println(string(buf))
+	log.Println(string(buf))
 }
 
 func printI(JsonMSI interface{}) {
 	buf, _ := ffjson.Marshal(&JsonMSI)
-	fmt.Println(string(buf))
+	log.Println(string(buf))
 }
 
 func RemodelJ(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -158,7 +159,7 @@ func RemodelJ(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		fmt.Println("could not read request body")
+		log.Println("could not read request body")
 	} else {
 		inputs := map[string][]byte{
 			"action":             []byte(``),
@@ -174,7 +175,7 @@ func RemodelJ(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 		remodler := Remodel(inputs["response_structure"], inputs["original_structure"], inputs["action"])
 		buf, _ := ffjson.Marshal(&remodler.objects) //&expectedJsonMSI)
-		fmt.Println(string(buf))
+		log.Println(string(buf))
 		fmt.Fprintf(w, string(buf))
 	}
 }
