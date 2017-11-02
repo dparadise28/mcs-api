@@ -28,18 +28,18 @@ type Totals struct {
 }
 
 type Cart struct {
-	ID           bson.ObjectId `bson:"_id" json:"id"`
-	Totals       Totals        `bson:"-" json:"totals"`
-	UserID       bson.ObjectId `bson:"user_id" json:"user_id"`
-	StoreID      bson.ObjectId `bson:"store_id" json:"store_id"`
-	Products     []CartProduct `bson:"products" json:"products"`
-	StoreName    string        `bson:"store_name" json:"store_name"`
-	CartState    int           `bson:"cart_state" json:"cart_state"`
-	ItemCount    uint16        `bson:"-" json:"item_count"`
-	DateCreated  time.Time     `bson:"created_at" json:"created_at"`
-	LastUpdated  time.Time     `bson:"last_updated" json:"last_updated"`
-	DeliveryFee  uint32        `bson:"delivery_fee" json:"delivery_fee"`
-	StoreTaxRate float64       `bson:"tax_rate" json:"tax_rate"`
+	ID          bson.ObjectId `bson:"_id" json:"id"`
+	Totals      Totals        `bson:"-" json:"totals"`
+	UserID      bson.ObjectId `bson:"user_id" json:"user_id"`
+	StoreID     bson.ObjectId `bson:"store_id" json:"store_id"`
+	Products    []CartProduct `bson:"products" json:"products"`
+	StoreName   string        `bson:"store_name" json:"store_name"`
+	CartState   int           `bson:"cart_state" json:"cart_state"`
+	ItemCount   uint16        `bson:"-" json:"item_count"`
+	DateCreated time.Time     `bson:"created_at" json:"created_at"`
+	LastUpdated time.Time     `bson:"last_updated" json:"last_updated"`
+	DeliveryFee uint32        `bson:"delivery_fee" json:"delivery_fee"`
+	// StoreTaxRate float64       `bson:"tax_rate" json:"tax_rate"`
 
 	//StoreInfo Store `bson:"-" json:"-"`
 	Store    Store `bson:"-" json:"-"`
@@ -90,7 +90,7 @@ func (cart *Cart) UpdateProductQuantityQueries(p CartProduct) []bson.M {
 				"created_at":   time.Now(),
 				"store_name":   cart.StoreName,
 				"cart_state":   CartStates["ACTIVE"],
-				"tax_rate":     cart.StoreTaxRate,
+				// "tax_rate":     cart.StoreTaxRate,
 			},
 		}
 	}
@@ -171,8 +171,9 @@ func (cart *Cart) UpdateCartTotals() {
 	for _, product := range cart.Products {
 		cart.Totals.Subtotal += product.PriceCents * uint32(product.Quantity)
 		cart.ItemCount += product.Quantity
+		cart.Totals.Tax += (product.TaxRate * float64(product.PriceCents) * float64(product.Quantity)) / 100
 	}
-	cart.Totals.Tax = float64(cart.Totals.Subtotal) * cart.StoreTaxRate / 100.00
+	// cart.Totals.Tax = float64(cart.Totals.Subtotal) * cart.StoreTaxRate / 100.00
 	cart.Totals.PickupTotal = cart.Totals.Tax + float64(cart.Totals.Subtotal)
 	cart.Totals.DeliveryTotal = cart.Totals.PickupTotal + float64(cart.DeliveryFee)
 	if cart.ApplyFee {

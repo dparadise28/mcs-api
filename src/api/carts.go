@@ -47,7 +47,7 @@ func UpdateCartProductQuantity(w http.ResponseWriter, r *http.Request, ps httpro
 			models.WriteNewError(w, err)
 			return
 		}
-		cart.StoreTaxRate = s.TaxRate
+		// cart.StoreTaxRate = s.TaxRate
 		cart.DeliveryFee = s.Delivery.Fee
 		cart.StoreName = s.Name
 		cart.IsNew = true

@@ -10,6 +10,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"log"
+	"math"
 	"strings"
 	"time"
 )
@@ -90,16 +91,42 @@ type TemplateAsset struct {
 	DBSession *mgo.Session  `bson:"-" json:"-"`
 }
 
-func (ta *TemplateAsset) RetrieveTemplateCategoryAssets(cid bson.ObjectId, pg int) []TemplateAsset {
-	var assets []TemplateAsset
-	c := ta.DB.C(AssetCollectionName).With(ta.DBSession)
-	c.Find(bson.M{
-		"template_category_id": cid,
-	}).Sort("$natural").Limit(100).Skip(100 * pg).All(&assets)
-	if assets == nil {
-		assets = []TemplateAsset{}
+type PaginatedTemplateAssets struct {
+	Metadata PaginationMetadata `bson:"-" json:"metadata"`
+	Results  []TemplateAsset    `bson:"-" json:"results"`
+
+	Size      int           `bson:"-" json:"-"`
+	CID       bson.ObjectId `bson:"-" json:"-"`
+	PG        int           `bson:"-" json:"-"`
+	DB        *mgo.Database `bson:"-" json:"-"`
+	DBSession *mgo.Session  `bson:"-" json:"-"`
+}
+
+func (p *PaginatedTemplateAssets) RetrieveTemplateCategoryAssets() {
+	c := p.DB.C(AssetCollectionName).With(p.DBSession)
+	query := bson.M{
+		"template_category_id": p.CID,
 	}
-	return assets
+	count, err := c.Find(query).Count()
+	if err != nil {
+		p.Results = []TemplateAsset{}
+	}
+	if p.PG*p.Size < count && err == nil {
+		c.Find(
+			query,
+		).Sort("$natural").Limit(p.Size).Skip(p.Size * p.PG).All(&p.Results)
+		if p.Results == nil {
+			p.Results = []TemplateAsset{}
+		}
+	} else {
+		p.Results = []TemplateAsset{}
+	}
+
+	p.Metadata.Page = p.PG
+	p.Metadata.PerPage = p.Size
+	p.Metadata.PageSize = len(p.Results)
+	p.Metadata.PageCount = int(math.Ceil(float64(count) / float64(p.Size)))
+	p.Metadata.TotalCount = count
 }
 
 func (a *Asset) RetrieveTemplateAssetById(id bson.ObjectId) {

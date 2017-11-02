@@ -8,6 +8,14 @@ import (
 var (
 	DOMAIN      = ""
 	UI_DIR_PATH = ""
+
+	DefaultPageSize = 50
+	PageSizes       = map[int]bool{
+		10:  true,
+		20:  true,
+		50:  true,
+		100: true,
+	}
 )
 
 type Email struct {
@@ -30,6 +38,14 @@ type GeoJson struct {
 type Hours struct {
 	From uint16 `json:"from" validate:"ltecsfield=To"`
 	To   uint16 `json:"to"`
+}
+
+type PaginationMetadata struct {
+	Page       int `bson:"-" json:"page"`
+	PerPage    int `bson:"-" json:"per_page"`
+	PageSize   int `bson:"-" json:"page_size"`
+	PageCount  int `bson:"-" json:"page_count"`
+	TotalCount int `bson:"-" json:"total_count"`
 }
 
 func I(array interface{}) []interface{} {

@@ -35,18 +35,23 @@ func RetrieveTemplateAsset(w http.ResponseWriter, r *http.Request, ps httprouter
 }
 
 func RetrieveTemplateAssets(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	var asset models.TemplateAsset
-	asset.DB = db.Database
-	asset.DBSession = asset.DB.Session.Copy()
-	defer asset.DBSession.Close()
+	var assets models.PaginatedTemplateAssets
+	assets.DB = db.Database
+	assets.DBSession = assets.DB.Session.Copy()
+	defer assets.DBSession.Close()
 
-	pg := 1
+	assets.PG = 1
+	assets.Size = models.DefaultPageSize
 	if p, err := strconv.Atoi(r.URL.Query().Get("p")); err == nil {
-		pg = p
+		assets.PG = p
 	}
-	assets := asset.RetrieveTemplateCategoryAssets(
-		bson.ObjectIdHex(r.URL.Query().Get("category_id")), pg,
-	)
+	if s, err := strconv.Atoi(r.URL.Query().Get("size")); err == nil {
+		if _, ok := models.PageSizes[s]; ok {
+			assets.Size = s
+		}
+	}
+	assets.CID = bson.ObjectIdHex(r.URL.Query().Get("category_id"))
+	assets.RetrieveTemplateCategoryAssets()
 	json.NewEncoder(w).Encode(assets)
 }
 

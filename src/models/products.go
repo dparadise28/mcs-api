@@ -4,64 +4,52 @@ import (
 	"errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"gopkg.in/mgo.v2/txn"
 	"log"
+	"math"
+	"strings"
 )
 
 var ProductCollectionName = "Products"
 
 type Product struct {
 	ID             bson.ObjectId `bson:"_id" json:"product_id"`
-	Size           string        `bson:"size" json:"size"`
+	Size           string        `bson:"size" json:"size" validate:"required"`
 	Image          string        `bson:"image" json:"image" validate:"required"`
 	AssetID        bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
-	Enabled        bool          `bson:"enabled" json:"enabled"`
+	Enabled        bool          `bson:"enabled" json:"enabled" validate:"required"`
 	StoreID        bson.ObjectId `bson:"store_id" json:"store_id"`
-	SortOrder      uint16        `bson:"sort_order" json:"sort_order"`
+	TaxRate        float64       `bson:"tax_rate" json:"tax_rate" validate:"required"`
 	PriceCents     uint32        `bson:"price_cents" json:"price_cents" validate:"required"`
-	CategoryID     bson.ObjectId `bson:"category_id" json:"category_id"`
+	CategoryID     bson.ObjectId `bson:"category_id" json:"category_id" validate:"required"`
 	ProductTitle   string        `bson:"title" json:"title" validate:"required"`
-	DisplayPrice   string        `bson:"-" json:"display_price"`
-	NewCategoryID  bson.ObjectId `bson:"-" json:"new_category_id"`
 	ProductRatings struct {
 		ReviewCount           uint64  `bson:"review_count" json:"total_reviews"`
 		ReviewPercentageScore float64 `bson:"pct_score" json:"review_percent"`
 	}
+	// DisplayPrice   string        `bson:"-" json:"display_price"`
+	// NewCategoryID  bson.ObjectId `bson:"-" json:"new_category_id"`
 
 	DB        *mgo.Database `bson:"-" json:"-"`
 	DBSession *mgo.Session  `bson:"-" json:"-"`
 }
 
-type ReadOnlyProduct struct {
-	ID         bson.ObjectId `bson:"_id" json:"product_id"`
-	Size       string        `bson:"size" json:"size"`
-	Image      string        `bson:"image" json:"image"`
-	AssetID    bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
-	Enabled    bool          `bson:"enabled" json:"enabled"`
-	StoreID    bson.ObjectId `bson:"store_id" json:"store_id"`
-	SortOrder  uint16        `bson:"sort_order" json:"sort_order"`
-	PriceCents uint32        `bson:"price_cents" json:"price_cents" validate:"required"`
-	CategoryID bson.ObjectId `bson:"category_id" json:"category_id"`
-	// Description    string        `bson:"desc" json:"description"`
-	ProductTitle   string        `bson:"title" json:"title" validate:"required"`
-	DisplayPrice   string        `bson:"-" json:"display_price"`
-	NewCategoryID  bson.ObjectId `bson:"-" json:"new_category_id"`
-	PreviousTnxOp  bson.ObjectId `bson:"previoustnxop" json:"-"`
-	ProductRatings struct {
-		ReviewCount           uint64  `bson:"review_count" json:"total_reviews"`
-		ReviewPercentageScore float64 `bson:"pct_score" json:"review_percent"`
-	}
-
-	DB        *mgo.Database `bson:"-" json:"-"`
-	DBSession *mgo.Session  `bson:"-" json:"-"`
+type NewProduct struct {
+	Size         string        `bson:"size" json:"size" validate:"required"`
+	Image        string        `bson:"image" json:"image" validate:"required"`
+	AssetID      bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
+	Enabled      bool          `bson:"enabled" json:"enabled" validate:"required"`
+	TaxRate      float64       `bson:"tax_rate" json:"tax_rate" validate:"required"`
+	PriceCents   uint32        `bson:"price_cents" json:"price_cents" validate:"required"`
+	CategoryID   bson.ObjectId `bson:"category_id" json:"category_id" validate:"required"`
+	ProductTitle string        `bson:"title" json:"title" validate:"required"`
 }
 
 type CartProduct struct {
-	//StoreID      bson.ObjectId `bson:"-" json:"store_id"`
 	ID           bson.ObjectId `bson:"_id" json:"product_id"`
 	Size         string        `bson:"size" json:"size"`
 	Image        string        `bson:"image" json:"image" validate:"required"`
 	AssetID      bson.ObjectId `bson:"asset_id" json:"asset_id" validate:"required"`
+	TaxRate      float64       `bson:"tax_rate" json:"tax_rate" validate:"required"`
 	Quantity     uint16        `bson:"qty" json:"quantity"`
 	PriceCents   uint32        `bson:"price_cents" json:"price_cents"`
 	ProductTitle string        `bson:"title" json:"title"`
@@ -85,17 +73,88 @@ type CartRequest struct {
 	Instructions string        `json:"instructions"`
 }
 
+type PaginatedProducts struct {
+	Metadata PaginationMetadata `bson:"-" json:"metadata"`
+	Results  []Product          `bson:"-" json:"results"`
+
+	Size      int           `bson:"-" json:"-"`
+	SID       bson.ObjectId `bson:"-" json:"-"`
+	CID       bson.ObjectId `bson:"-" json:"-"`
+	PG        int           `bson:"-" json:"-"`
+	DB        *mgo.Database `bson:"-" json:"-"`
+	DBSession *mgo.Session  `bson:"-" json:"-"`
+}
+
+func (p *Product) AddProducts(products []NewProduct, sid bson.ObjectId) (error, []Product) {
+	newProducts := []Product{}
+	cmap := map[bson.ObjectId]bool{}
+	for _, np := range products {
+		cmap[np.CategoryID] = true
+		newProducts = append(newProducts, Product{
+			ID:           bson.NewObjectId(),
+			Size:         np.Size,
+			Image:        np.Image,
+			AssetID:      np.AssetID,
+			Enabled:      np.Enabled,
+			StoreID:      sid,
+			TaxRate:      np.TaxRate,
+			PriceCents:   np.PriceCents,
+			CategoryID:   np.CategoryID,
+			ProductTitle: np.ProductTitle,
+		})
+	}
+
+	cids := []bson.ObjectId{}
+	for k, _ := range cmap {
+		cids = append(cids, k)
+	}
+	cat := p.DB.C(TemplateCategoryCollectionName).With(p.DBSession)
+	ccount, err := cat.Find(bson.M{
+		"_id": bson.M{
+			"$in": cids,
+		},
+	}).Count()
+	if err != nil || ccount != len(cids) {
+		return errors.New("Please only include available categories."), []Product{}
+	}
+	c := p.DB.C(ProductCollectionName).With(p.DBSession)
+	if insert_err := c.Insert(I(newProducts)...); insert_err != nil {
+		if strings.Count(insert_err.Error(), "ObjectId") == 1 {
+			return nil, newProducts
+		}
+		return insert_err, []Product{}
+	}
+	return nil, newProducts
+}
+
+func (p *PaginatedProducts) RetrieveStoreProductsByCategory() {
+	c := p.DB.C(ProductCollectionName).With(p.DBSession)
+	query := bson.M{
+		"category_id": p.CID,
+	}
+	count, err := c.Find(query).Count()
+	if err != nil {
+		p.Results = []Product{}
+	}
+	if p.PG*p.Size < count && err == nil {
+		c.Find(query).Sort("$natural").Limit(p.Size).Skip(p.Size * p.PG).All(&p.Results)
+		if p.Results == nil {
+			p.Results = []Product{}
+		}
+	} else {
+		p.Results = []Product{}
+	}
+
+	p.Metadata.Page = p.PG
+	p.Metadata.PerPage = p.Size
+	p.Metadata.PageSize = len(p.Results)
+	p.Metadata.PageCount = int(math.Ceil(float64(count) / float64(p.Size)))
+	p.Metadata.TotalCount = count
+}
+
 func (p *Product) AddProductToStoreCategory() error {
 	c := p.DB.C(ProductCollectionName).With(p.DBSession)
-
-	// might want to avoid lookup and just set sort index to staticaly
-	// defined cap on number of categories
-	cur_seq_len, _ := c.Find(bson.M{
-		"store_id":    p.StoreID,
-		"category_id": p.CategoryID,
-	}).Count()
 	p.ID = bson.NewObjectId()
-	p.SortOrder = uint16(cur_seq_len) + 1
 	if insert_err := c.Insert(&p); insert_err != nil {
 		return insert_err
 	}
@@ -129,11 +188,10 @@ func (p *Product) UpdateStoreProduct() {
 		Remove:    false,
 		Update: bson.M{
 			"$set": bson.M{
-				// "desc":        p.Description,
 				"title":       p.ProductTitle,
 				"size":        p.Size,
 				"price_cents": p.PriceCents,
-				"category_id": p.NewCategoryID,
+				// "category_id": p.NewCategoryID,
 			},
 		},
 	}
@@ -143,52 +201,4 @@ func (p *Product) UpdateStoreProduct() {
 		"category_id": p.CategoryID,
 	}).Apply(change, p)
 	log.Println(info)
-}
-
-func (p *ProductOrder) ReorderStoreProducts() error {
-	c := p.DB.C(ProductCollectionName).With(p.DBSession)
-	p_count, err := c.Find(bson.M{
-		"$and": []bson.M{
-			bson.M{
-				"category_id": p.CID,
-				"store_id":    p.SID,
-				"enabled":     true,
-			}, bson.M{
-				"_id": bson.M{
-					"$in": p.PIDS,
-				},
-			},
-		},
-	}).Count()
-	if err != nil || p_count != len(p.PIDS) {
-		return errors.New("All active product ids must be provided. You may not include any products not currently enabled.")
-	}
-
-	previousTnx := ReadOnlyProduct{}
-	c.Find(bson.M{
-		"store_id":    p.SID,
-		"category_id": p.CID,
-		"previoustnxop": bson.M{
-			"$exists": true,
-		},
-	}).One(&previousTnx)
-
-	op_id := bson.NewObjectId()
-	operations := make([]txn.Op, len(p.PIDS))
-	for index, id := range p.PIDS {
-		operations[index] = txn.Op{
-			C:  ProductCollectionName,
-			Id: id,
-			Update: bson.M{
-				"$set": bson.M{
-					"sort_order":    index,
-					"previoustnxop": op_id,
-				},
-			},
-		}
-	}
-	runner := txn.NewRunner(c)
-	run_err := runner.Run(operations, op_id, nil)
-	c.Remove(bson.M{"_id": previousTnx.PreviousTnxOp})
-	return run_err
 }

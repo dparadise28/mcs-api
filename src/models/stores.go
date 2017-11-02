@@ -2,7 +2,6 @@ package models
 
 import (
 	"encoding/json"
-	//	"errors"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"log"
@@ -104,32 +103,27 @@ type Store struct {
 	ReviewScore      int64               `bson:"review_score" json:"review_score"`
 	ReviewCount      int64               `bson:"review_count" json:"review_count"`
 	CategoryIds      []bson.ObjectId     `bson:"category_ids" json:"category_ids"`
-	// CategoryNames []string        `bson:"c_names" json:"category_names"`
-	// CTree         []StoreCategory `bson:"-" json:"categories" validate:"required,dive"`
-
-	// products []Product `bson:"-" json:"-"`
 
 	DB        *mgo.Database `bson:"-" json:"-"`
 	DBSession *mgo.Session  `bson:"-" json:"-"`
 }
 
 type StoreReturn struct {
-	ID           bson.ObjectId      `bson:"_id,omitempty" json:"store_id"`
-	Name         string             `bson:"name" json:"name"`
-	Image        string             `json:"image"`
-	Phone        string             `json:"phone" validate:"required"`
-	CTree        []StoreCategory    `bson:"categories" json:"categories" validate:"required,dive"`
-	Email        string             `json:"email" validate:"required,email"`
-	Pickup       StorePickup        `json:"pickup" validate:"required,dive"`
-	Address      Address            `json:"address" validate:"required,dive"`
-	TaxRate      float64            `bson:"tax_rate" json:"tax_rate" validate:"required"`
-	Enabled      bool               `bson:"enabled" json:"enabled"`
-	Delivery     StoreDelivery      `json:"delivery" validate:"dive"`
-	Distance     float64            `bson:"distance,omitempty" json:"distance"`
-	ReviewScore  int64              `bson:"review_score" json:"review_score"`
-	ReviewCount  int64              `bson:"review_count" json:"review_count"`
-	WorkingHours WeeklyWorkingHours `bson:"working_hours" json:"working_hours" validate:"required,dive"`
-	//	CategoryNames    []string            `bson:"c_names" json:"category_names"`
+	ID               bson.ObjectId       `bson:"_id,omitempty" json:"store_id"`
+	Name             string              `bson:"name" json:"name"`
+	Image            string              `json:"image"`
+	Phone            string              `json:"phone" validate:"required"`
+	CTree            []StoreCategory     `bson:"categories" json:"categories" validate:"required,dive"`
+	Email            string              `json:"email" validate:"required,email"`
+	Pickup           StorePickup         `json:"pickup" validate:"required,dive"`
+	Address          Address             `json:"address" validate:"required,dive"`
+	TaxRate          float64             `bson:"tax_rate" json:"tax_rate" validate:"required"`
+	Enabled          bool                `bson:"enabled" json:"enabled"`
+	Delivery         StoreDelivery       `json:"delivery" validate:"dive"`
+	Distance         float64             `bson:"distance,omitempty" json:"distance"`
+	ReviewScore      int64               `bson:"review_score" json:"review_score"`
+	ReviewCount      int64               `bson:"review_count" json:"review_count"`
+	WorkingHours     WeeklyWorkingHours  `bson:"working_hours" json:"working_hours" validate:"required,dive"`
 	PaymentDetails   StorePaymentDetails `bson:"payment_details" json:"payment_details" validate:"-"`
 	LongDescription  string              `bson:"long_desc" json:"long_description" validate:"max=200"`
 	ShortDescription string              `bson:"short_desc" json:"short_description" validate:"max=50"`
@@ -165,36 +159,6 @@ func (s *Store) PrepStoreEntitiesForInsert() error {
 	s.PaymentDetails.LegalEntity.BillingAddress.ID = s.ID
 	s.PaymentDetails.LegalEntity.BillingAddress.UserID = s.ID
 	s.PaymentDetails.StoreID = s.ID
-	// s.CategoryNames = []string{}
-	/*
-		for category_index, _ := range s.CTree {
-			c_id := bson.NewObjectId()
-
-			s.CTree[category_index].ID = c_id
-			s.CTree[category_index].StoreId = s.ID
-			s.CTree[category_index].Enabled = true
-			s.CTree[category_index].SortOrder = uint16(category_index)
-
-			s.CategoryNames = append(s.CategoryNames, s.CTree[category_index].Name)
-			for product_index, _ := range s.CTree[category_index].Products {
-				if s.CTree[category_index].Products[product_index].AssetID.Hex() == "" {
-					return errors.New("Must provide a valid asset_id for every product.")
-				}
-				p_id := bson.NewObjectId()
-
-				s.CTree[category_index].Products[product_index].ID = p_id
-				s.CTree[category_index].Products[product_index].Enabled = true
-				s.CTree[category_index].Products[product_index].StoreID = s.ID
-				s.CTree[category_index].Products[product_index].CategoryID = c_id
-				s.CTree[category_index].Products[product_index].SortOrder = uint16(product_index)
-
-				s.products = append(s.products, s.CTree[category_index].Products[product_index])
-			}
-		}
-	*/
-	// if len(s.products) == 0 || len(s.CategoryNames) == 0 {
-	//  	return errors.New("Please make sure you added at least one category and product before continuing.")
-	// }
 	return nil
 }
 
@@ -331,98 +295,3 @@ func (s *Store) AddStoreCCPaymentMethod() error {
 	}).Apply(change, s)
 	return err
 }
-
-/*
-func (s *Store) InsertStoreCategories() error {
-	c := s.DB.C(CategoryCollectionName).With(s.DBSession)
-	if insert_err := c.Insert(I(s.CTree)...); insert_err != nil {
-		if strings.Count(insert_err.Error(), "ObjectId") == 1 {
-			log.Println("during categories")
-			log.Println(insert_err)
-			return nil
-		}
-		return insert_err
-	}
-	return s.InsertStoreProducts()
-}
-
-func (s *Store) InsertStoreProducts() error {
-	c := s.DB.C(ProductCollectionName).With(s.DBSession)
-	if insert_err := c.Insert(I(s.products)...); insert_err != nil {
-		log.Println("during products")
-		log.Println(insert_err)
-		if strings.Count(insert_err.Error(), "ObjectId") == 1 {
-			return nil
-		}
-		return insert_err
-	}
-	return s.InsertStoreProducts()
-}
-
-func (s *Store) RetrieveFullStoreByID(id string) (error, StoreReturn) {
-	pipeline := []bson.M{
-		bson.M{
-			"$match": bson.M{
-				"_id": bson.ObjectIdHex(id),
-			},
-		},
-		bson.M{
-			"$lookup": bson.M{
-				"from":         CategoryCollectionName,
-				"localField":   "_id",
-				"foreignField": "store_id",
-				"as":           "categories",
-			},
-		},
-		bson.M{
-			"$unwind": bson.M{
-				"path": "$categories",
-				"preserveNullAndEmptyArrays": true,
-			},
-		},
-		bson.M{
-			"$sort": bson.M{
-				"categories.sort_order": 1,
-			},
-		},
-		bson.M{
-			"$lookup": bson.M{
-				"from":         ProductCollectionName,
-				"localField":   "categories._id",
-				"foreignField": "category_id",
-				"as":           "categories.products",
-			},
-		},
-		bson.M{
-			"$group": bson.M{
-				"_id":               "$_id",
-				"name":              bson.M{"$first": "$name"},
-				"email":             bson.M{"$first": "$email"},
-				"image":             bson.M{"$first": "$image"},
-				"phone":             bson.M{"$first": "$phone"},
-				"pickup":            bson.M{"$first": "$pickup"},
-				"address":           bson.M{"$first": "$address"},
-				"delivery":          bson.M{"$first": "$delivery"},
-				"tax_rate":          bson.M{"$first": "$tax_rate"},
-				"distance":          bson.M{"$first": "$distance"},
-				"categories":        bson.M{"$push": "$categories"},
-				"working_hours":     bson.M{"$first": "$working_hours"},
-				"payment_details":   bson.M{"$first": "$payment_details"},
-				"long_description":  bson.M{"$first": "$long_desc"},
-				"short_description": bson.M{"$first": "$short_desc"},
-			},
-		},
-		bson.M{
-			"$sort": bson.M{
-				"categories.sort_order":          1,
-				"categories.products.sort_order": 1,
-			},
-		},
-	}
-	c := s.DB.C(StoreCollectionName).With(s.DBSession)
-	pipe := c.Pipe(pipeline)
-	resp := []StoreReturn{}
-	err := pipe.All(&resp)
-	return err, resp[0]
-}
-*/
