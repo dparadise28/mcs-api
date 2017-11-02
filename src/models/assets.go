@@ -95,26 +95,34 @@ type PaginatedTemplateAssets struct {
 	Metadata PaginationMetadata `bson:"-" json:"metadata"`
 	Results  []TemplateAsset    `bson:"-" json:"results"`
 
-	Size      int           `bson:"-" json:"-"`
-	CID       bson.ObjectId `bson:"-" json:"-"`
-	PG        int           `bson:"-" json:"-"`
-	DB        *mgo.Database `bson:"-" json:"-"`
-	DBSession *mgo.Session  `bson:"-" json:"-"`
+	Size      int             `bson:"-" json:"-"`
+	AIDS      []bson.ObjectId `bson:"-" json:"-"`
+	CID       bson.ObjectId   `bson:"-" json:"-"`
+	SID       bson.ObjectId   `bson:"-" json:"-"`
+	PG        int             `bson:"-" json:"-"`
+	DB        *mgo.Database   `bson:"-" json:"-"`
+	DBSession *mgo.Session    `bson:"-" json:"-"`
 }
 
 func (p *PaginatedTemplateAssets) RetrieveTemplateCategoryAssets() {
 	c := p.DB.C(AssetCollectionName).With(p.DBSession)
+
+	// find asset ids for all products currently in the store to clear them from the response
+	pc := p.DB.C(ProductCollectionName).With(p.DBSession)
+	pc.Find(bson.M{"store_id": p.SID, "category_id": p.CID}).Distinct("asset_id", &p.AIDS)
+
 	query := bson.M{
 		"template_category_id": p.CID,
+		"_id": bson.M{
+			"$nin": p.AIDS,
+		},
 	}
 	count, err := c.Find(query).Count()
 	if err != nil {
 		p.Results = []TemplateAsset{}
 	}
 	if p.PG*p.Size < count && err == nil {
-		c.Find(
-			query,
-		).Sort("$natural").Limit(p.Size).Skip(p.Size * p.PG).All(&p.Results)
+		c.Find(query).Sort("$natural").Limit(p.Size).Skip(p.Size * p.PG).All(&p.Results)
 		if p.Results == nil {
 			p.Results = []TemplateAsset{}
 		}

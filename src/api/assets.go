@@ -3,6 +3,7 @@ package api
 import (
 	"db"
 	"encoding/json"
+	"errors"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/mgo.v2/bson"
 	"log"
@@ -41,15 +42,25 @@ func RetrieveTemplateAssets(w http.ResponseWriter, r *http.Request, ps httproute
 	defer assets.DBSession.Close()
 
 	assets.PG = 1
-	assets.Size = models.DefaultPageSize
 	if p, err := strconv.Atoi(r.URL.Query().Get("p")); err == nil {
 		assets.PG = p
 	}
+	assets.Size = models.DefaultPageSize
 	if s, err := strconv.Atoi(r.URL.Query().Get("size")); err == nil {
 		if _, ok := models.PageSizes[s]; ok {
 			assets.Size = s
 		}
 	}
+	if r.Header.Get(models.STOREID_HEADER_NAME) != "" {
+		assets.SID = bson.ObjectIdHex(r.Header.Get(models.STOREID_HEADER_NAME))
+	} else {
+		if r.URL.Query().Get("store_id") == "" {
+			models.WriteNewError(w, errors.New("Please provide a valid store id."))
+			return
+		}
+		assets.SID = bson.ObjectIdHex(r.URL.Query().Get("store_id"))
+	}
+
 	assets.CID = bson.ObjectIdHex(r.URL.Query().Get("category_id"))
 	assets.RetrieveTemplateCategoryAssets()
 	json.NewEncoder(w).Encode(assets)
